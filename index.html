@@ -1,0 +1,2737 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rol de Turnos - Farmacia de Dosis Unitaria</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js para las gráficas de rendimiento/asistencia -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        shift: {
+                            m5: '#0284c7',
+                            d3: '#f59e0b',
+                            m3: '#2563eb',
+                            g12: '#7c3aed',
+                            fer: '#ef4444',
+                            vac: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; font-size: 12px; }
+        
+        .grid-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .grid-table th, .grid-table td {
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .grid-table th:first-child, .grid-table td:first-child {
+            border-left: 1px solid #cbd5e1;
+        }
+        .grid-table tr:first-child th {
+            border-top: 1px solid #cbd5e1;
+        }
+        
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: #ffffff;
+            z-index: 10;
+            text-align: left !important;
+            padding-left: 8px !important;
+        }
+
+        .cell-shift {
+            cursor: pointer;
+            user-select: none;
+            font-weight: 700;
+            font-size: 11px;
+            transition: all 0.12s ease;
+            height: 30px;
+            min-width: 32px;
+        }
+        .cell-shift:hover {
+            outline: 2px solid #0284c7;
+            z-index: 5;
+        }
+
+        .shift-M5 { background-color: #0284c7; color: #ffffff; }
+        .shift-D3 { background-color: #f59e0b; color: #0f172a; }
+        .shift-M3 { background-color: #2563eb; color: #ffffff; }
+        .shift-G12 { background-color: #7c3aed; color: #ffffff; }
+        .shift-FER { background-color: #fee2e2; color: #dc2626; font-size: 9px; font-weight: 800; }
+        .shift-VAC { background-color: #cbd5e1; color: #334155; font-size: 9px; font-weight: 800; }
+        .shift-OFF { background-color: #ffffff; color: #cbd5e1; }
+        .shift-SUNDAY { background-color: #fff1f2; }
+        .shift-HOLIDAY { background-color: #fef2f2; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-success {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .animate-success {
+            animation: pulse-success 0.3s ease-in-out;
+        }
+
+        /* --- ESTILOS MEJORADOS PARA PABELLONES Y CAMAS --- */
+
+        /* Tarjeta contenedora de Pabellón */
+        .pavilion-card {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-left: 5px solid #0d9488; /* Borde lateral verde teal */
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease-in-out;
+        }
+        .pavilion-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Badge de la Entidad Hospitalaria */
+        .pavilion-entity-tag {
+            background-color: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Sticker / Badge de Camas (Pabellón y Subpabellón) */
+        .bed-sticker {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(13, 148, 136, 0.25);
+        }
+
+        /* Sticker de Subpabellón individual */
+        .subpavilion-item {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 8px 12px;
+            transition: background-color 0.15s ease;
+        }
+        .subpavilion-item:hover {
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        /* Badge mini de rango de camas en subpabellón */
+        .subpavilion-bed-badge {
+            background-color: #ccfbf1;
+            color: #0f766e;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-full px-4 py-2.5 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-blue-600 text-white rounded-xl shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-hospital-user text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm sm:text-base leading-tight uppercase tracking-wider">Farmacia de Dosis Unitaria</h1>
+                    <p class="text-[11px] text-slate-400">Programación de Turnos QF, TEC & DIG (Meta Estricta 150 hrs/mes)</p>
+                </div>
+            </div>
+
+            <!-- Selector de Mes y Año -->
+            <div class="flex items-center space-x-2 bg-slate-800 p-1.5 rounded-xl border border-slate-700">
+                <button onclick="changeMonth(-1)" class="p-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span id="current-month-display" class="font-bold text-xs px-2 text-blue-400 min-w-[130px] text-center uppercase">SEPTIEMBRE 2026</span>
+                <button onclick="changeMonth(1)" class="p-1.5 hover:bg-slate-700 rounded-lg text-slate-300 transition">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Navegación entre Vistas -->
+            <div class="flex flex-wrap bg-slate-800 p-1 rounded-xl text-xs font-semibold gap-1">
+                <button onclick="switchView('schedule')" id="btn-view-schedule" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition">
+                    <i class="fa-solid fa-calendar-days mr-1.5"></i> Programación
+                </button>
+                <button onclick="switchView('kiosk')" id="btn-view-kiosk" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-clock text-emerald-400 mr-1.5"></i> Marcaje Asistencia
+                </button>
+                <button onclick="switchView('reports')" id="btn-view-reports" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-chart-bar text-amber-400 mr-1.5"></i> Registro Real y Métricas
+                </button>
+                <button onclick="switchView('workers')" id="btn-view-workers" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-users text-sky-400 mr-1.5"></i> Gestión Personal
+                </button>
+                <button onclick="switchView('pavilions')" id="btn-view-pavilions" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-hospital-bed text-teal-400 mr-1.5"></i> Pabellones
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <script>
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        class DataService {
+            constructor() {
+                this.STORAGE_KEYS = {
+                    WORKERS: 'du_workers_v5',
+                    SHIFTS: 'du_shifts_v5',
+                    HOLIDAYS: 'du_holidays_v5',
+                    ATTENDANCE: 'du_attendance_v5',
+                    PAVILIONS: 'du_pavilions_v5'
+                };
+                this._initDefaultData();
+            }
+
+            async _delay() { return new Promise(res => setTimeout(res, 15)); }
+
+            _initDefaultData() {
+                if (!localStorage.getItem(this.STORAGE_KEYS.PAVILIONS)) {
+                    const defaultPavilions = [
+                        { id: 'pav_1', entity: 'Servicio de Medicina', name: 'Pabellón A - Medicina Interna', subpavilions: [{ name: 'Sala A1', startBed: 1, endBed: 15 }, { name: 'Sala A2', startBed: 16, endBed: 30 }] },
+                        { id: 'pav_2', entity: 'Servicio de Cirugía', name: 'Pabellón B - Cirugía General', subpavilions: [{ name: 'Piso 2 Norte', startBed: 31, endBed: 50 }] },
+                        { id: 'pav_3', entity: 'Servicio de Pediatría', name: 'Pabellón C - Pediatría', subpavilions: [{ name: 'Lactantes', startBed: 1, endBed: 10 }, { name: 'Preescolares', startBed: 11, endBed: 25 }] }
+                    ];
+                    localStorage.setItem(this.STORAGE_KEYS.PAVILIONS, JSON.stringify(defaultPavilions));
+                }
+
+                if (!localStorage.getItem(this.STORAGE_KEYS.WORKERS)) {
+                    const defaultWorkers = [
+                        { id: 'qf1', name: 'QF. Aguirre Macavilca Juan C.', role: 'QF', dni: '45892011', barcode: 'QF1001', targetHours: 150, pavilionId: 'pav_1', pavilionScope: 'SUB', assignedSubpavilions: ['Sala A1'] },
+                        { id: 'qf2', name: 'QF. Reyes Benavides Milagros', role: 'QF', dni: '41203948', barcode: 'QF1002', targetHours: 150, pavilionId: 'pav_1', pavilionScope: 'SUB', assignedSubpavilions: ['Sala A2'] },
+                        { id: 'qf3', name: 'QF. Cairo Arellano Melva', role: 'QF', dni: '10293847', barcode: 'QF1003', targetHours: 150, pavilionId: 'pav_2', pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'qf4', name: 'QF. Injante Ibazeta Bertha', role: 'QF', dni: '09812345', barcode: 'QF1004', targetHours: 150, pavilionId: 'pav_3', pavilionScope: 'FULL', assignedSubpavilions: [] },
+
+                        { id: 'tec1', name: 'Candela Perez Karim Consuelo', role: 'TEC', dni: '42819203', barcode: 'TEC2001', targetHours: 150, pavilionId: 'pav_1', pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'tec2', name: 'Huaraya Medina Lorenzo', role: 'TEC', dni: '47102938', barcode: 'TEC2002', targetHours: 150, pavilionId: 'pav_2', pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'tec3', name: 'Velasquez Velasquez Rocio', role: 'TEC', dni: '44910293', barcode: 'TEC2003', targetHours: 150, pavilionId: 'pav_3', pavilionScope: 'FULL', assignedSubpavilions: [] },
+
+                        { id: 'dig1', name: 'Dig. Mendoza Morales Carlos', role: 'DIG', dni: '49102938', barcode: 'DIG3001', targetHours: 150, pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'dig2', name: 'Dig. Torres Sanchez Sofia', role: 'DIG', dni: '43820192', barcode: 'DIG3002', targetHours: 150, pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'dig3', name: 'Dig. Ramirez Flores Pedro', role: 'DIG', dni: '42910283', barcode: 'DIG3003', targetHours: 150, pavilionScope: 'FULL', assignedSubpavilions: [] },
+                        { id: 'dig4', name: 'Dig. Gomez Cruz Ana', role: 'DIG', dni: '41920394', barcode: 'DIG3004', targetHours: 150, pavilionScope: 'FULL', assignedSubpavilions: [] }
+                    ];
+                    localStorage.setItem(this.STORAGE_KEYS.WORKERS, JSON.stringify(defaultWorkers));
+                }
+
+                if (!localStorage.getItem(this.STORAGE_KEYS.HOLIDAYS)) {
+                    const holidays = {
+                        "2026-01-01": "Año Nuevo",
+                        "2026-05-01": "Día del Trabajo",
+                        "2026-06-29": "San Pedro y San Pablo",
+                        "2026-07-28": "Fiestas Patrias",
+                        "2026-07-29": "Fiestas Patrias",
+                        "2026-08-06": "Batalla de Junín",
+                        "2026-08-30": "Santa Rosa de Lima",
+                        "2026-10-08": "Combate de Angamos",
+                        "2026-11-01": "Día de Todos los Santos",
+                        "2026-12-08": "Inmaculada Concepción",
+                        "2026-12-09": "Batalla de Ayacucho",
+                        "2026-12-25": "Navidad"
+                    };
+                    localStorage.setItem(this.STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
+                }
+
+                if (!localStorage.getItem(this.STORAGE_KEYS.SHIFTS)) {
+                    localStorage.setItem(this.STORAGE_KEYS.SHIFTS, JSON.stringify({}));
+                }
+
+                if (!localStorage.getItem(this.STORAGE_KEYS.ATTENDANCE)) {
+                    localStorage.setItem(this.STORAGE_KEYS.ATTENDANCE, JSON.stringify([]));
+                }
+            }
+
+            async getWorkers() {
+                await this._delay();
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.WORKERS) || '[]');
+            }
+
+            async saveWorker(worker) {
+                await this._delay();
+                const workers = await this.getWorkers();
+                if (worker.id) {
+                    const idx = workers.findIndex(w => w.id === worker.id);
+                    if (idx !== -1) workers[idx] = worker;
+                } else {
+                    worker.id = 'w_' + Date.now();
+                    workers.push(worker);
+                }
+                localStorage.setItem(this.STORAGE_KEYS.WORKERS, JSON.stringify(workers));
+                return worker;
+            }
+
+            async deleteWorker(id) {
+                await this._delay();
+                let workers = await this.getWorkers();
+                workers = workers.filter(w => w.id !== id);
+                localStorage.setItem(this.STORAGE_KEYS.WORKERS, JSON.stringify(workers));
+            }
+
+            async getHolidays() {
+                await this._delay();
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.HOLIDAYS) || '{}');
+            }
+
+            async toggleHoliday(dateStr, label = "Feriado") {
+                await this._delay();
+                const holidays = await this.getHolidays();
+                if (holidays[dateStr]) {
+                    delete holidays[dateStr];
+                } else {
+                    holidays[dateStr] = label;
+                }
+                localStorage.setItem(this.STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
+                return holidays;
+            }
+
+            async getMonthlyShifts(yearMonth) {
+                await this._delay();
+                const allShifts = JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SHIFTS) || '{}');
+                return allShifts[yearMonth] || {};
+            }
+
+            async getAllShifts() {
+                await this._delay();
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SHIFTS) || '{}');
+            }
+
+            async saveShift(yearMonth, workerId, day, shiftCode) {
+                await this._delay();
+                const allShifts = JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SHIFTS) || '{}');
+                if (!allShifts[yearMonth]) allShifts[yearMonth] = {};
+                if (!allShifts[yearMonth][workerId]) allShifts[yearMonth][workerId] = {};
+
+                if (shiftCode === '' || shiftCode === 'OFF') {
+                    delete allShifts[yearMonth][workerId][day];
+                } else {
+                    allShifts[yearMonth][workerId][day] = shiftCode;
+                }
+                localStorage.setItem(this.STORAGE_KEYS.SHIFTS, JSON.stringify(allShifts));
+            }
+
+            async saveVacationPeriod(yearMonth, workerId, startDay, durationDays) {
+                await this._delay();
+                const allShifts = JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SHIFTS) || '{}');
+                if (!allShifts[yearMonth]) allShifts[yearMonth] = {};
+                if (!allShifts[yearMonth][workerId]) allShifts[yearMonth][workerId] = {};
+
+                for (let d = startDay; d < startDay + durationDays; d++) {
+                    if (d <= 31) {
+                        allShifts[yearMonth][workerId][d] = 'VAC';
+                    }
+                }
+                localStorage.setItem(this.STORAGE_KEYS.SHIFTS, JSON.stringify(allShifts));
+            }
+
+            async getAttendanceLogs() {
+                await this._delay();
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.ATTENDANCE) || '[]');
+            }
+
+            async addAttendanceLog(log) {
+                await this._delay();
+                const logs = await this.getAttendanceLogs();
+                log.id = 'att_' + Date.now();
+                logs.push(log);
+                localStorage.setItem(this.STORAGE_KEYS.ATTENDANCE, JSON.stringify(logs));
+                return log;
+            }
+
+            async getPavilions() {
+                await this._delay();
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.PAVILIONS) || '[]');
+            }
+
+            async savePavilion(pavilion) {
+                await this._delay();
+                const list = await this.getPavilions();
+                if (pavilion.id) {
+                    const idx = list.findIndex(p => p.id === pavilion.id);
+                    if (idx !== -1) list[idx] = pavilion;
+                } else {
+                    pavilion.id = 'pav_' + Date.now();
+                    list.push(pavilion);
+                }
+                localStorage.setItem(this.STORAGE_KEYS.PAVILIONS, JSON.stringify(list));
+                return pavilion;
+            }
+
+            async deletePavilion(id) {
+                await this._delay();
+                let list = await this.getPavilions();
+                list = list.filter(p => p.id !== id);
+                localStorage.setItem(this.STORAGE_KEYS.PAVILIONS, JSON.stringify(list));
+            }
+        }
+
+        const db = new DataService();
+    </script>
+
+    <main class="flex-1 max-w-full p-2 sm:p-4 overflow-x-auto">
+
+        <!-- VISTA 1: PROGRAMACIÓN DE TURNOS -->
+        <section id="view-schedule" class="space-y-3">
+            <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span class="text-slate-500 mr-1 font-bold">Leyenda:</span>
+                    <span class="px-2 py-1 rounded bg-purple-600 text-white shadow-xs" title="Guardia QF/DIG (7:00 AM - 7:00 PM / 12h)">G12: Guardia (12h)</span>
+                    <span class="px-2 py-1 rounded bg-blue-600 text-white shadow-xs" title="Mañana (7:00 AM - 1:00 PM / 6h)">M3: Mañana (6h)</span>
+                    <span class="px-2 py-1 rounded bg-sky-600 text-white shadow-xs" title="Mañana (8:00 AM - 2:00 PM / 6h)">M5: Mañana (6h)</span>
+                    <span class="px-2 py-1 rounded bg-amber-500 text-slate-900 shadow-xs" title="Tarde (1:00 PM - 7:00 PM / 6h)">D3: Tarde Apoyo (6h)</span>
+                    <span class="px-2 py-1 rounded bg-red-100 text-red-700 border border-red-300">FER: Feriado</span>
+                    <span class="px-2 py-1 rounded bg-slate-300 text-slate-800">VAC: Vacaciones</span>
+                    
+                    <span class="border-l border-slate-300 pl-2 text-slate-500 font-bold ml-1">Marcación Real:</span>
+                    <span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10px]">🟢 Puntual</span>
+                    <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-bold text-[10px]">🟡 Tardanza</span>
+                    <span class="px-2 py-0.5 rounded bg-rose-600 text-white font-bold text-[10px]">🔴 Falta / Sin Marca</span>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <select id="role-filter" onchange="renderScheduleTable()" class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 bg-slate-50 focus:outline-none">
+                        <option value="ALL">Todo el Personal (QF / TEC / DIG)</option>
+                        <option value="QF">Solo Químicos Farmacéuticos (QF)</option>
+                        <option value="TEC">Solo Técnicos en Farmacia</option>
+                        <option value="DIG">Solo Digitadores</option>
+                    </select>
+
+                    <button onclick="openAutoGenerateModal()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Generar Rol (150h)
+                    </button>
+
+                    <button onclick="openWorkerModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-xl shadow transition">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Personal
+                    </button>
+
+                    <button onclick="openVacationModal()" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white font-semibold text-xs rounded-xl shadow transition">
+                        <i class="fa-solid fa-umbrella-beach mr-1"></i> Vacaciones
+                    </button>
+
+                    <button onclick="exportToCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow transition">
+                        <i class="fa-solid fa-file-excel mr-1"></i> Exportar
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto max-h-[76vh]">
+                    <table id="schedule-table" class="grid-table w-full text-xs">
+                        <!-- Renderizado Dinámico por JS -->
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA 2: KIOSCO DE MARCAJE -->
+        <section id="view-kiosk" class="hidden max-w-2xl mx-auto py-4 space-y-5">
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-slate-200 text-center space-y-6">
+                
+                <div class="bg-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-inner relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 opacity-10 text-white">
+                        <i class="fa-solid fa-clock text-9xl"></i>
+                    </div>
+                    <div id="kiosk-date" class="text-blue-400 font-bold uppercase tracking-widest text-xs mb-1">Cargando fecha...</div>
+                    <div id="kiosk-time" class="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white">00:00:00</div>
+                </div>
+
+                <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 font-bold text-xs">
+                    <button id="tab-kiosk-scan" onclick="switchKioskMode('scan')" class="flex-1 py-2.5 rounded-lg bg-blue-600 text-white shadow transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-barcode text-base"></i>
+                        <span>ESCANEO DE CARNET / BARCODE</span>
+                    </button>
+                    <button id="tab-kiosk-manual" onclick="switchKioskMode('manual')" class="flex-1 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-id-card text-base"></i>
+                        <span>INGRESO MANUAL POR DNI</span>
+                    </button>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-center items-center gap-4 text-xs font-bold">
+                    <span class="text-slate-600">Acción a Registrar:</span>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                        <input type="radio" name="kiosk-action-type" value="IN" checked class="accent-emerald-600">
+                        <i class="fa-solid fa-right-to-bracket"></i> MARCAR ENTRADA
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+                        <input type="radio" name="kiosk-action-type" value="OUT" class="accent-rose-600">
+                        <i class="fa-solid fa-right-from-bracket"></i> MARCAR SALIDA
+                    </label>
+                </div>
+
+                <div id="kiosk-mode-scan" class="space-y-4">
+                    <div class="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 text-left space-y-2">
+                        <label for="kiosk-barcode-input" class="block text-xs font-bold text-blue-900 uppercase flex items-center gap-2">
+                            <i class="fa-solid fa-circle-dot text-blue-600 animate-pulse"></i> Pase su carnet o fotocheck por el lector:
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="kiosk-barcode-input" placeholder="Escanee código o digite aquí y presione Enter..." autocomplete="off"
+                                   class="w-full pl-10 pr-4 py-3 bg-white rounded-xl border-2 border-blue-400 text-sm font-mono font-bold text-slate-800 focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-sm"
+                                   onkeydown="handleBarcodeKeyPress(event)">
+                            <div class="absolute left-3.5 top-3.5 text-blue-500">
+                                <i class="fa-solid fa-barcode text-lg"></i>
+                            </div>
+                        </div>
+                        <p class="text-[11px] text-slate-500 italic">El lector de código de barras enviará un 'Enter' automáticamente para procesar la asistencia.</p>
+                    </div>
+                </div>
+
+                <div id="kiosk-mode-manual" class="hidden space-y-4 text-left">
+                    <div class="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 space-y-3">
+                        <p class="text-xs font-bold text-amber-900 flex items-center gap-2">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> ¿Olvidó su carnet? Verificación por DNI:
+                        </p>
+                        
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">1. Seleccione su Nombre:</label>
+                            <select id="kiosk-manual-worker-select" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-amber-500">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">2. Digite su DNI para Confirmar Identidad:</label>
+                            <input type="password" id="kiosk-manual-dni-input" maxlength="8" placeholder="Ingrese número de DNI (8 dígitos)" 
+                                   class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-800 bg-white focus:ring-2 focus:ring-amber-500">
+                        </div>
+
+                        <button onclick="submitManualAttendance()" class="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-user-check"></i> VERIFICAR E INGRESAR MARCAJE
+                        </button>
+                    </div>
+                </div>
+
+                <div id="kiosk-result-card" class="hidden p-4 rounded-2xl border text-left transition-all">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div id="kiosk-result-icon" class="w-10 h-10 rounded-xl flex items-center justify-center text-xl text-white">
+                                <i class="fa-solid fa-check"></i>
+                            </div>
+                            <div>
+                                <h4 id="kiosk-result-name" class="font-bold text-sm text-slate-800">Nombre del Trabajador</h4>
+                                <p id="kiosk-result-detail" class="text-xs text-slate-500">Detalles de la marca</p>
+                            </div>
+                        </div>
+                        <span id="kiosk-result-badge" class="px-2.5 py-1 rounded-lg font-extrabold text-xs uppercase">ENTRADA</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- VISTA 3: REPORTE DE MARCAJE REAL Y MÉTRICAS DE AMONESTACIÓN -->
+        <section id="view-reports" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-indigo-600"></i> Métricas de Asistencia y Evaluación para Amonestaciones
+                        </h2>
+                        <p class="text-xs text-slate-500">Análisis personalizado de Puntualidad, Tardanzas y Faltas por trabajador o equipo completo</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <div>
+                            <label for="metrics-worker-select" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Personal:</label>
+                            <select id="metrics-worker-select" onchange="renderAttendanceMetricsAndChart()" class="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Modalidad Fecha:</label>
+                            <select id="metrics-date-mode" onchange="toggleMetricsDateInputs()" class="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-indigo-500">
+                                <option value="MONTH">Mes Actual Seleccionado</option>
+                                <option value="RANGE">Rango (Desde - Hasta)</option>
+                                <option value="ALL">Todo el Historial</option>
+                            </select>
+                        </div>
+
+                        <div id="metrics-range-inputs" class="hidden flex items-center gap-2">
+                            <div>
+                                <label for="metrics-start-date" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Desde:</label>
+                                <input type="date" id="metrics-start-date" onchange="renderAttendanceMetricsAndChart()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                            </div>
+                            <div>
+                                <label for="metrics-end-date" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Hasta:</label>
+                                <input type="date" id="metrics-end-date" onchange="renderAttendanceMetricsAndChart()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                            </div>
+                        </div>
+
+                        <div class="self-end">
+                            <button onclick="renderAttendanceMetricsAndChart()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition shadow">
+                                <i class="fa-solid fa-filter"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center relative min-h-[260px]">
+                        <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Distribución de Marcaciones</h3>
+                        <div class="w-48 h-48 relative">
+                            <canvas id="attendanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold uppercase">Puntualidad</span>
+                                    <i class="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
+                                </div>
+                                <div id="metric-punctual-pct" class="text-2xl font-black mt-2">0%</div>
+                                <p id="metric-punctual-count" class="text-[11px] text-emerald-700 font-semibold mt-1">0 de 0 turnos</p>
+                            </div>
+
+                            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold uppercase">Tardanzas</span>
+                                    <i class="fa-solid fa-clock text-amber-600 text-lg"></i>
+                                </div>
+                                <div id="metric-late-pct" class="text-2xl font-black mt-2">0%</div>
+                                <p id="metric-late-count" class="text-[11px] text-amber-700 font-semibold mt-1">0 de 0 turnos</p>
+                            </div>
+
+                            <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold uppercase">Faltas / Sin Marca</span>
+                                    <i class="fa-solid fa-user-xmark text-rose-600 text-lg"></i>
+                                </div>
+                                <div id="metric-absent-pct" class="text-2xl font-black mt-2">0%</div>
+                                <p id="metric-absent-count" class="text-[11px] text-rose-700 font-semibold mt-1">0 de 0 turnos</p>
+                            </div>
+                        </div>
+
+                        <div id="sanction-status-box" class="p-4 rounded-2xl border transition-all flex items-start gap-3 bg-slate-100 border-slate-300">
+                            <div id="sanction-icon-bg" class="p-2.5 rounded-xl text-white bg-slate-600">
+                                <i id="sanction-icon" class="fa-solid fa-shield-halved text-xl"></i>
+                            </div>
+                            <div class="space-y-1">
+                                <h4 id="sanction-title" class="font-bold text-xs uppercase tracking-wide text-slate-800">Evaluación Disciplinaria</h4>
+                                <p id="sanction-description" class="text-xs text-slate-600 leading-relaxed">Seleccione un trabajador para evaluar el historial del periodo.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 border-b pb-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Historial de Marcajes Registrados (Kiosco / Lector)</h2>
+                        <p class="text-xs text-slate-500">Registro unificado con hora de entrada y salida por personal</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 w-full lg:w-auto">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Filtrar Personal:</label>
+                            <select id="attendance-worker-filter" onchange="loadAttendanceLogs()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white">
+                                <option value="ALL">-- Todo el Personal --</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Filtro de Fecha:</label>
+                            <select id="attendance-filter-mode" onchange="toggleAttendanceDateInputs()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white">
+                                <option value="SINGLE">Una Fecha Específica</option>
+                                <option value="RANGE">De Tal Fecha a Tal Fecha</option>
+                                <option value="ALL">Escoger Todo (Historial Completo)</option>
+                            </select>
+                        </div>
+
+                        <div id="attendance-single-date-box">
+                            <label for="attendance-date-filter" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Fecha:</label>
+                            <input type="date" id="attendance-date-filter" onchange="loadAttendanceLogs()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 bg-white">
+                        </div>
+
+                        <div id="attendance-range-date-box" class="hidden flex items-center gap-2">
+                            <div>
+                                <label for="attendance-start-date" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Desde:</label>
+                                <input type="date" id="attendance-start-date" onchange="loadAttendanceLogs()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                            </div>
+                            <div>
+                                <label for="attendance-end-date" class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Hasta:</label>
+                                <input type="date" id="attendance-end-date" onchange="loadAttendanceLogs()" class="px-2 py-1 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                            </div>
+                        </div>
+
+                        <div class="flex items-end gap-1 mt-3 sm:mt-0">
+                            <button onclick="setAttendanceFilterToday()" class="px-2.5 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 font-bold text-xs rounded-lg transition" title="Ver Hoy">
+                                Hoy
+                            </button>
+                            <button onclick="loadAttendanceLogs()" class="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition">
+                                <i class="fa-solid fa-rotate mr-1"></i> Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600">
+                        <thead class="bg-slate-100 text-slate-700 font-bold uppercase border-b">
+                            <tr>
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Personal</th>
+                                <th class="p-3">DNI / Fotocheck</th>
+                                <th class="p-3">Turno Programado</th>
+                                <th class="p-3 text-center bg-emerald-50 text-emerald-800 border-x border-emerald-200"><i class="fa-solid fa-right-to-bracket mr-1"></i> Entrada</th>
+                                <th class="p-3 text-center bg-rose-50 text-rose-800 border-r border-rose-200"><i class="fa-solid fa-right-from-bracket mr-1"></i> Salida</th>
+                                <th class="p-3 text-center">Estado / Método</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendance-logs-body" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA 4: GESTIÓN DE PERSONAL REGISTRADO -->
+        <section id="view-workers" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-users text-blue-600"></i> Gestión e Inventario de Personal
+                        </h2>
+                        <p class="text-xs text-slate-500">Lista completa de Químicos Farmacéuticos, Técnicos y Digitadores. Haz clic en una fila para ver el desglose de pabellones asignados.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="text" id="worker-search-input" onkeyup="renderWorkerManagementList()" placeholder="Buscar por nombre, DNI o código..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:ring-2 focus:ring-blue-500 min-w-[220px]">
+                        <button onclick="openWorkerModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-plus"></i> Agregar Nuevo Personal
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-600 border border-slate-200 rounded-xl overflow-hidden">
+                        <thead class="bg-slate-800 text-white font-bold uppercase">
+                            <tr>
+                                <th class="p-3 w-10 text-center">N°</th>
+                                <th class="p-3">Apellidos y Nombres</th>
+                                <th class="p-3">DNI</th>
+                                <th class="p-3">Código Fotocheck</th>
+                                <th class="p-3">Cargo / Rol</th>
+                                <th class="p-3">Pabellón / Asignación</th>
+                                <th class="p-3 text-center">Meta Horas</th>
+                                <th class="p-3 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="worker-management-body" class="divide-y divide-slate-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISTA 5: GESTIÓN DE PABELLONES Y CAMAS -->
+        <section id="view-pavilions" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-hospital-bed text-teal-600"></i> Pabellones y Subpabellones
+                        </h2>
+                        <p class="text-xs text-slate-500">Configuración de estructura de camas para asignación de QF y Técnicos</p>
+                    </div>
+                    <button onclick="openPavilionModal()" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> Crear Nuevo Pabellón
+                    </button>
+                </div>
+
+                <div id="pavilions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL POPUP PARA SELECTOR RÁPIDO DE TURNO -->
+    <div id="modal-shift-picker" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-5 space-y-4 border border-slate-200">
+            <div class="flex justify-between items-center border-b pb-2">
+                <div>
+                    <h3 id="picker-title-name" class="font-bold text-sm text-slate-800">Asignar Turno</h3>
+                    <p id="picker-title-date" class="text-xs text-slate-500">Día X</p>
+                </div>
+                <button onclick="closeShiftPicker()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs font-bold">
+                <button onclick="assignSelectedShift('G12')" class="p-2.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 text-center shadow col-span-2">
+                    G12 - Guardia (12h)<br><span class="text-[10px] font-normal">7:00 AM - 7:00 PM</span>
+                </button>
+                <button onclick="assignSelectedShift('M3')" class="p-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 text-center shadow col-span-2">
+                    M3 - Mañana (6h)<br><span class="text-[10px] font-normal">7:00 AM - 1:00 PM</span>
+                </button>
+                <button onclick="assignSelectedShift('M5')" class="p-2.5 rounded-xl bg-sky-600 text-white hover:bg-sky-700 text-center shadow">
+                    M5 - Mañana (6h)<br><span class="text-[10px] font-normal">8:00 AM - 2:00 PM</span>
+                </button>
+                <button onclick="assignSelectedShift('D3')" class="p-2.5 rounded-xl bg-amber-500 text-slate-900 hover:bg-amber-600 text-center shadow">
+                    D3 - Tarde (6h)<br><span class="text-[10px] font-normal">1:00 PM - 7:00 PM</span>
+                </button>
+                <button onclick="assignSelectedShift('FER')" class="p-2.5 rounded-xl bg-red-100 text-red-800 border border-red-300 hover:bg-red-200 text-center shadow col-span-2">
+                    FER - Feriado Libre
+                </button>
+                <button onclick="assignSelectedShift('VAC')" class="p-2 rounded-xl bg-slate-300 text-slate-800 hover:bg-slate-400 text-center col-span-2">
+                    VAC - Vacaciones
+                </button>
+                <button onclick="assignSelectedShift('OFF')" class="p-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 text-center col-span-2">
+                    OFF - Descanso / Libres
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRO/EDICIÓN PERSONAL -->
+    <div id="modal-worker" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <h3 id="modal-worker-title" class="font-bold text-base text-slate-800 border-b pb-2">Agregar / Editar Integrante</h3>
+            <form onsubmit="saveWorkerForm(event)" class="space-y-3">
+                <input type="hidden" id="w-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Nombres y Apellidos</label>
+                    <input type="text" id="w-name" required placeholder="Ej: QF. Perez Juan / Dig. Castro Ana" class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">DNI (8 dígitos)</label>
+                        <input type="text" id="w-dni" maxlength="8" required placeholder="12345678" class="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Código Fotocheck</label>
+                        <input type="text" id="w-barcode" required placeholder="QF1001 / TEC2001" class="w-full px-3 py-2 border rounded-xl text-xs font-mono uppercase focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Cargo / Rol</label>
+                    <select id="w-role" class="w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500">
+                        <option value="QF">Químico Farmacéutico (QF)</option>
+                        <option value="TEC">Técnico en Farmacia</option>
+                        <option value="DIG">Digitador(a)</option>
+                    </select>
+                </div>
+
+                <div class="space-y-2 border-t pt-3">
+                    <label class="block text-xs font-bold text-slate-800 uppercase">Asignación Hospitalaria</label>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Pabellón Principal</label>
+                        <select id="w-pavilion" onchange="handleWorkerPavilionChange()" class="w-full px-3 py-2 border rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Sin Pabellón Asignado --</option>
+                        </select>
+                    </div>
+
+                    <div id="w-scope-container" class="hidden space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <label class="block text-[11px] font-bold text-slate-700">Cobertura en este Pabellón:</label>
+                        <div class="flex items-center gap-4 text-xs">
+                            <label class="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                                <input type="radio" name="w-pavilion-scope" value="FULL" checked onchange="handleWorkerScopeChange()" class="accent-blue-600">
+                                Pabellón Completo
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                                <input type="radio" name="w-pavilion-scope" value="SUB" onchange="handleWorkerScopeChange()" class="accent-blue-600">
+                                Subpabellón(es) Específico(s)
+                            </label>
+                        </div>
+
+                        <div id="w-subpavilions-selector" class="hidden space-y-1.5 pt-2 border-t border-slate-200">
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase">Seleccione los Subpabellones que le tocan:</label>
+                            <div id="w-subpavilions-list" class="space-y-1 max-h-32 overflow-y-auto pr-1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeWorkerModal()" class="px-3 py-1.5 text-xs text-slate-600 font-semibold hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition">Guardar Datos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIRMACIÓN DE ELIMINACIÓN -->
+    <div id="modal-confirm-delete" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs p-5 space-y-4 text-center">
+            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-user-minus"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-sm text-slate-800">¿Eliminar Trabajador?</h3>
+                <p class="text-xs text-slate-500 mt-1">Esta acción removerá el registro y sus asignaciones del sistema.</p>
+            </div>
+            <div class="flex justify-center space-x-2 pt-2">
+                <button onclick="closeDeleteModal()" class="px-3 py-1.5 text-xs text-slate-600 font-semibold bg-slate-100 rounded-xl">Cancelar</button>
+                <button id="btn-confirm-delete-action" class="px-4 py-1.5 text-xs bg-rose-600 text-white font-bold rounded-xl shadow">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL VACACIONES -->
+    <div id="modal-vacation" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-bold text-base text-slate-800 border-b pb-2">Programar Periodo de Vacaciones</h3>
+            <form onsubmit="saveVacationForm(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Personal</label>
+                    <select id="vac-worker-select" class="w-full px-3 py-2 border rounded-xl text-xs font-semibold">
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Día Inicio (1-31)</label>
+                        <input type="number" id="vac-start-day" min="1" max="31" value="1" required class="w-full px-3 py-2 border rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Duración (Días)</label>
+                        <select id="vac-duration" class="w-full px-3 py-2 border rounded-xl text-xs font-semibold">
+                            <option value="30">30 Días (Mes completo)</option>
+                            <option value="15">15 Días</option>
+                            <option value="7">7 Días</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closeVacationModal()" class="px-3 py-1.5 text-xs text-slate-600 font-semibold">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs bg-slate-800 text-white font-bold rounded-xl shadow">Asignar Vacaciones</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL GENERACIÓN AUTOMÁTICA CON LÓGICA HORARIA INDEPENDIENTE -->
+    <div id="modal-autogen" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 border border-slate-100">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-800">Generación Inteligente de Rol Hospitalario</h3>
+                        <p class="text-xs text-slate-500">Programación Estricta por Profesión (Meta: 150 Horas/Mes)</p>
+                    </div>
+                </div>
+                <button onclick="closeAutoGenerateModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-600">
+                <div class="p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl space-y-1.5">
+                    <p class="font-bold text-indigo-950 flex items-center gap-1.5 text-xs"><i class="fa-solid fa-shield-halved text-indigo-600"></i> Selecciona la profesión a generar:</p>
+                    <p class="text-slate-600 text-[11px]">Genera los horarios de cada rol de forma independiente para evitar bloqueos en el algoritmo.</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 pt-1">
+                    <button type="button" onclick="executeAutoGenerationByRole('QF')" class="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow flex items-center justify-between transition">
+                        <span><i class="fa-solid fa-user-doctor mr-2"></i> Generar Horario Químicos Farmacéuticos (QF)</span>
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+
+                    <button type="button" onclick="executeAutoGenerationByRole('TEC')" class="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow flex items-center justify-between transition">
+                        <span><i class="fa-solid fa-user-nurse mr-2"></i> Generar Horario Técnicos en Farmacia (TEC)</span>
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+
+                    <button type="button" onclick="executeAutoGenerationByRole('DIG')" class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow flex items-center justify-between transition">
+                        <span><i class="fa-solid fa-keyboard mr-2"></i> Generar Horario Digitadores (DIG)</span>
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="pt-2 border-t flex justify-between items-center">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="autogen-clear-existing" checked class="w-4 h-4 text-indigo-600 rounded">
+                        <span class="font-semibold text-slate-700 text-xs">Mantener Vacaciones (VAC) asignadas</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t">
+                <button type="button" onclick="closeAutoGenerateModal()" class="px-4 py-2 text-xs text-slate-600 font-semibold hover:bg-slate-100 rounded-xl">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRO/EDICIÓN DE PABELLÓN -->
+    <div id="modal-pavilion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-4 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <h3 id="modal-pavilion-title" class="font-bold text-base text-slate-800 border-b pb-2">Crear Pabellón</h3>
+            <form onsubmit="savePavilionForm(event)" class="space-y-4">
+                <input type="hidden" id="p-id">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Entidad Hospitalaria / Servicio</label>
+                        <input type="text" id="p-entity" required placeholder="Ej: Servicio de Medicina Hospitalaria" class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Pabellón</label>
+                        <input type="text" id="p-name" required placeholder="Ej: Pabellón B - Pediatría" class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-2 border-b pb-1">
+                        <label class="block text-xs font-bold text-slate-700">Subpabellones y Rango de Camas</label>
+                        <button type="button" onclick="addSubpavilionRow()" class="px-2 py-1 bg-teal-100 hover:bg-teal-200 text-teal-800 text-xs font-bold rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Agregar Subpabellón
+                        </button>
+                    </div>
+                    
+                    <div id="subpavilions-container" class="space-y-2">
+                    </div>
+                </div>
+
+                <div class="p-3 bg-teal-50 rounded-xl border border-teal-200 flex justify-between items-center text-xs font-bold text-teal-900">
+                    <span>Total de Camas Estimadas:</span>
+                    <span id="p-total-beds" class="text-sm font-black font-mono">0 Camas</span>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-3">
+                    <button type="button" onclick="closePavilionModal()" class="px-3 py-1.5 text-xs text-slate-600 font-semibold hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow transition">Guardar Pabellón</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICADOR -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs font-semibold hidden flex items-center space-x-2">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toast-msg">Mensaje</span>
+    </div>
+
+    <script>
+        let currentDate = new Date(2026, 8, 1);
+        let activeCellTarget = null;
+        let workerToDeleteId = null;
+        let attendanceChartInstance = null;
+
+        const SHIFT_HOURS = {
+            'G12': 12,
+            'M3': 6,
+            'M5': 6,
+            'D3': 6,
+            'FER': 0,
+            'VAC': 0,
+            'OFF': 0
+        };
+
+        const SHIFT_ENTRY_TIMES = {
+            'G12': { hour: 7, minute: 0 },
+            'M3':  { hour: 7, minute: 0 },
+            'M5':  { hour: 8, minute: 0 },
+            'D3':  { hour: 13, minute: 0 }
+        };
+
+        function showToast(msg, isSuccess = true) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const text = document.getElementById('toast-msg');
+            
+            text.innerText = msg;
+            if (isSuccess) {
+                icon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            } else {
+                icon.className = "fa-solid fa-circle-xmark text-rose-400 text-base";
+            }
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3500);
+        }
+
+        function getYearMonthKey() {
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        function updateMonthDisplay() {
+            const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const display = document.getElementById('current-month-display');
+            if (display) {
+                display.innerText = `${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+            }
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            updateMonthDisplay();
+            renderScheduleTable();
+            if (!document.getElementById('view-reports').classList.contains('hidden')) {
+                populateMetricsWorkerSelect();
+                populateAttendanceWorkerFilter();
+                renderAttendanceMetricsAndChart();
+            }
+        }
+
+        function switchView(viewName) {
+            document.getElementById('view-schedule').classList.add('hidden');
+            document.getElementById('view-kiosk').classList.add('hidden');
+            document.getElementById('view-reports').classList.add('hidden');
+            document.getElementById('view-workers').classList.add('hidden');
+            document.getElementById('view-pavilions').classList.add('hidden');
+
+            document.getElementById('btn-view-schedule').className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+            document.getElementById('btn-view-kiosk').className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+            document.getElementById('btn-view-reports').className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+            document.getElementById('btn-view-workers').className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+            document.getElementById('btn-view-pavilions').className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+
+            if (viewName === 'schedule') {
+                document.getElementById('view-schedule').classList.remove('hidden');
+                document.getElementById('btn-view-schedule').className = 'px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition';
+                renderScheduleTable();
+            } else if (viewName === 'kiosk') {
+                document.getElementById('view-kiosk').classList.remove('hidden');
+                document.getElementById('btn-view-kiosk').className = 'px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition';
+                loadKioskWorkers();
+            } else if (viewName === 'reports') {
+                document.getElementById('view-reports').classList.remove('hidden');
+                document.getElementById('btn-view-reports').className = 'px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition';
+                
+                const dateInput = document.getElementById('attendance-date-filter');
+                if (dateInput && !dateInput.value) {
+                    dateInput.value = new Date().toISOString().split('T')[0];
+                }
+                populateAttendanceWorkerFilter();
+                populateMetricsWorkerSelect();
+                loadAttendanceLogs();
+                renderAttendanceMetricsAndChart();
+            } else if (viewName === 'workers') {
+                document.getElementById('view-workers').classList.remove('hidden');
+                document.getElementById('btn-view-workers').className = 'px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition';
+                renderWorkerManagementList();
+            } else if (viewName === 'pavilions') {
+                document.getElementById('view-pavilions').classList.remove('hidden');
+                document.getElementById('btn-view-pavilions').className = 'px-3 py-1.5 rounded-lg bg-blue-600 text-white shadow transition';
+                renderPavilionsGrid();
+            }
+        }
+
+        async function toggleHolidayHeader(day) {
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(day).padStart(2, '0');
+            const dateKey = `${year}-${month}-${dayStr}`;
+            await db.toggleHoliday(dateKey, `Feriado Día ${day}`);
+            renderScheduleTable();
+        }
+
+        function switchKioskMode(mode) {
+            const scanTab = document.getElementById('tab-kiosk-scan');
+            const manualTab = document.getElementById('tab-kiosk-manual');
+            const scanDiv = document.getElementById('kiosk-mode-scan');
+            const manualDiv = document.getElementById('kiosk-mode-manual');
+
+            if (mode === 'scan') {
+                scanTab.className = 'flex-1 py-2.5 rounded-lg bg-blue-600 text-white shadow transition flex items-center justify-center gap-2';
+                manualTab.className = 'flex-1 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center justify-center gap-2';
+                scanDiv.classList.remove('hidden');
+                manualDiv.classList.add('hidden');
+                document.getElementById('kiosk-barcode-input').focus();
+            } else {
+                manualTab.className = 'flex-1 py-2.5 rounded-lg bg-blue-600 text-white shadow transition flex items-center justify-center gap-2';
+                scanTab.className = 'flex-1 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center justify-center gap-2';
+                manualDiv.classList.remove('hidden');
+                scanDiv.classList.add('hidden');
+            }
+        }
+
+        async function handleBarcodeKeyPress(e) {
+            if (e.key === 'Enter') {
+                const val = e.target.value.trim().toUpperCase();
+                if (!val) return;
+                const workers = await db.getWorkers();
+                const worker = workers.find(w => w.barcode === val || w.dni === val);
+                if (worker) {
+                    const actionType = document.querySelector('input[name="kiosk-action-type"]:checked')?.value || 'IN';
+                    await processAttendanceRegistration(worker, actionType, 'LECTOR / BARCODE');
+                    e.target.value = '';
+                } else {
+                    showToast('Código/DNI no registrado en el sistema.', false);
+                }
+            }
+        }
+
+        async function submitManualAttendance() {
+            const workerId = document.getElementById('kiosk-manual-worker-select').value;
+            const dniInput = document.getElementById('kiosk-manual-dni-input').value.trim();
+
+            if (!workerId) {
+                showToast('Seleccione un trabajador de la lista.', false);
+                return;
+            }
+            const workers = await db.getWorkers();
+            const worker = workers.find(w => w.id === workerId);
+            if (!worker) return;
+
+            if (worker.dni !== dniInput) {
+                showToast('El DNI ingresado no coincide con el trabajador.', false);
+                return;
+            }
+
+            const actionType = document.querySelector('input[name="kiosk-action-type"]:checked')?.value || 'IN';
+            await processAttendanceRegistration(worker, actionType, 'MANUAL DNI');
+            document.getElementById('kiosk-manual-dni-input').value = '';
+        }
+
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                const clockTime = document.getElementById('kiosk-time');
+                const clockDate = document.getElementById('kiosk-date');
+                if (clockTime) {
+                    clockTime.innerText = now.toLocaleTimeString('es-PE', { hour12: false });
+                }
+                if (clockDate) {
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    clockDate.innerText = now.toLocaleDateString('es-PE', options);
+                }
+            }, 1000);
+        }
+
+        window.onload = function() {
+            updateMonthDisplay();
+            renderScheduleTable();
+            startClock();
+            loadKioskWorkers();
+            const dateInput = document.getElementById('attendance-date-filter');
+            if (dateInput) {
+                const now = new Date();
+                const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                if (dateInput) {
+                    dateInput.value = todayLocal;
+                }
+            }
+        };
+
+        function getAttendanceStatus(worker, dateStr, shiftCode, logs) {
+            if (!shiftCode || shiftCode === 'OFF' || shiftCode === 'FER' || shiftCode === 'VAC') {
+                return null;
+            }
+
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+
+            const log = logs.find(l => {
+                const isSameWorker = (l.workerDni && l.workerDni === worker.dni) || 
+                                    (l.workerBarcode && l.workerBarcode === worker.barcode) ||
+                                    (l.workerName === worker.name);
+                
+                const logDate = l.timestamp ? l.timestamp.split('T')[0].split(' ')[0] : '';
+                return isSameWorker && logDate === dateStr && l.type === 'ENTRADA';
+            });
+
+            if (!log) {
+                if (dateStr <= todayStr) {
+                    return { status: 'ABSENT', css: 'bg-rose-600 text-white font-black border-2 border-rose-800 shadow-md', label: '🔴 Falta / Sin Marcación' };
+                }
+                return null;
+            }
+
+            let timeParts = '';
+            if (log.timestamp.includes('T')) {
+                timeParts = log.timestamp.split('T')[1] || '';
+            } else {
+                timeParts = log.timestamp.split(' ')[1] || '';
+            }
+
+            const [h, m] = timeParts.split(':').map(Number);
+            
+            if (isNaN(h) || isNaN(m)) {
+                return { status: 'PUNCTUAL', css: 'bg-emerald-600 text-white font-black border-2 border-emerald-800 shadow-md', label: '🟢 Marcado' };
+            }
+
+            const markedMins = h * 60 + m;
+            const shiftConfig = SHIFT_ENTRY_TIMES[shiftCode] || { hour: 8, minute: 0 };
+            const scheduledMins = shiftConfig.hour * 60 + shiftConfig.minute;
+            const maxAllowedMins = scheduledMins + 5;
+
+            if (markedMins <= maxAllowedMins) {
+                return { 
+                    status: 'PUNCTUAL', 
+                    css: 'bg-emerald-600 text-white font-black border-2 border-emerald-800 shadow-md', 
+                    label: `🟢 Puntual (${timeParts.substring(0,5)})` 
+                };
+            } else {
+                return { 
+                    status: 'LATE', 
+                    css: 'bg-amber-400 text-slate-950 font-black border-2 border-amber-600 shadow-md', 
+                    label: `🟡 Tardanza (${timeParts.substring(0,5)})` 
+                };
+            }
+        }
+
+        async function editWorkerById(workerId) {
+            const workers = await db.getWorkers();
+            const worker = workers.find(w => w.id === workerId);
+            if (worker) {
+                await openWorkerModal(worker);
+            }
+        }
+
+        async function renderScheduleTable() {
+            const yearMonth = getYearMonthKey();
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            const workers = await db.getWorkers();
+            const shifts = await db.getMonthlyShifts(yearMonth);
+            const holidays = await db.getHolidays();
+            const attendanceLogs = await db.getAttendanceLogs();
+            const roleFilter = document.getElementById('role-filter').value;
+
+            const filteredWorkers = roleFilter === 'ALL' 
+                ? workers 
+                : workers.filter(w => w.role === roleFilter);
+
+            const table = document.getElementById('schedule-table');
+            table.innerHTML = '';
+
+            let headerHTML = `<thead><tr class="bg-slate-800 text-white font-bold">`;
+            headerHTML += `<th class="p-2 text-center w-8">N°</th>`;
+            headerHTML += `<th class="p-2 sticky-col bg-slate-800 text-white min-w-[230px]">Nombres y Apellidos del Personal</th>`;
+
+            for (let d = 1; d <= totalDays; d++) {
+                const dayDate = new Date(year, month, d);
+                const isSunday = dayDate.getDay() === 0;
+                const monthStr = String(month + 1).padStart(2, '0');
+                const dayStr = String(d).padStart(2, '0');
+                const dateKey = `${year}-${monthStr}-${dayStr}`;
+                const isHoliday = !!holidays[dateKey];
+
+                let cellClass = 'bg-slate-800 text-white';
+                let titleText = `Día ${d}`;
+
+                if (isHoliday) {
+                    cellClass = 'bg-red-600 text-white font-black cursor-pointer';
+                    titleText = `FERIADO: ${holidays[dateKey]} (Click para cambiar)`;
+                } else if (isSunday) {
+                    cellClass = 'bg-rose-600 text-white font-black cursor-pointer';
+                    titleText = `Domingo (Click para alternar feriado)`;
+                } else {
+                    cellClass += ' cursor-pointer hover:bg-slate-700';
+                }
+
+                headerHTML += `<th onclick="toggleHolidayHeader(${d})" class="w-8 p-1 text-center text-[10px] ${cellClass}" title="${escapeHTML(titleText)}">${d}<br>${isHoliday ? 'FER' : (isSunday ? 'DOM' : '')}</th>`;
+            }
+
+            headerHTML += `<th class="p-2 text-center min-w-[65px] bg-slate-900 text-amber-400">TOTAL HRS</th></tr></thead>`;
+
+            let bodyHTML = `<tbody>`;
+
+            const renderGroup = (groupTitle, groupWorkers) => {
+                if (groupWorkers.length === 0) return '';
+                let html = `<tr class="bg-slate-200 font-bold text-slate-800 text-left"><td colspan="${totalDays + 3}" class="p-2 pl-3 bg-slate-200 uppercase tracking-wider text-[11px] border-y border-slate-300">${escapeHTML(groupTitle)}</td></tr>`;
+
+                groupWorkers.forEach((w, index) => {
+                    const workerShifts = shifts[w.id] || {};
+                    let workerTotalHours = 0;
+
+                    html += `<tr class="hover:bg-slate-50 transition">`;
+                    html += `<td class="p-1 text-slate-400 font-mono text-[11px]">${index + 1}</td>`;
+                    html += `<td class="p-1 sticky-col font-medium text-slate-800 flex justify-between items-center group">
+                                <div class="truncate max-w-[170px]">
+                                    <span class="font-bold block text-slate-800" title="${escapeHTML(w.name)}">${escapeHTML(w.name)}</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">DNI: ${escapeHTML(w.dni || 'S/D')} | Cod: ${escapeHTML(w.barcode || 'S/C')}</span>
+                                </div>
+                                <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition">
+                                    <button onclick="editWorkerById('${w.id}')" class="text-slate-400 hover:text-blue-600 p-1" title="Editar Personal">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    <button onclick="openDeleteModal('${w.id}')" class="text-slate-400 hover:text-rose-600 p-1" title="Eliminar Personal">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                             </td>`;
+
+                    for (let d = 1; d <= totalDays; d++) {
+                        const shift = workerShifts[d] || '';
+                        const dayDate = new Date(year, month, d);
+                        const isSunday = dayDate.getDay() === 0;
+
+                        const monthStr = String(month + 1).padStart(2, '0');
+                        const dayStr = String(d).padStart(2, '0');
+                        const dateKey = `${year}-${monthStr}-${dayStr}`;
+                        const isHoliday = !!holidays[dateKey];
+
+                        workerTotalHours += (SHIFT_HOURS[shift] || 0);
+
+                        let shiftClass = 'shift-OFF';
+                        let displayCode = shift;
+                        
+                        const attEval = getAttendanceStatus(w, dateKey, displayCode, attendanceLogs);
+                        
+                        if (attEval) {
+                            shiftClass = attEval.css;
+                        } else if (shift) {
+                            shiftClass = `shift-${displayCode}`;
+                        }
+
+                        const sundayBg = (isSunday && !shift && !attEval) ? 'shift-SUNDAY' : '';
+                        const holidayBg = (isHoliday && !shift && !attEval) ? 'shift-HOLIDAY' : '';
+                        const titleTag = attEval ? `Día ${d}: ${displayCode} - ${attEval.label}` : `Día ${d}: ${shift || 'Descanso'}`;
+
+                        html += `<td onclick="openShiftPicker('${w.id}', ${d}, '${shift}')" 
+                                     class="cell-shift ${shiftClass} ${sundayBg} ${holidayBg}" title="${escapeHTML(titleTag)}">
+                                     ${displayCode}
+                                 </td>`;
+                    }
+
+                    const targetClass = workerTotalHours === 150 
+                        ? 'text-emerald-700 font-extrabold bg-emerald-50' 
+                        : (workerTotalHours < 150 ? 'text-amber-700 font-bold' : 'text-purple-700 font-bold');
+
+                    html += `<td class="p-1 font-mono font-bold text-center ${targetClass}">${workerTotalHours}h</td>`;
+                    html += `</tr>`;
+                });
+
+                return html;
+            };
+
+            const qfWorkers = filteredWorkers.filter(w => w.role === 'QF' || w.name.startsWith('QF'));
+            const tecWorkers = filteredWorkers.filter(w => w.role === 'TEC' && !w.name.startsWith('QF'));
+            const digWorkers = filteredWorkers.filter(w => w.role === 'DIG' || w.name.startsWith('Dig'));
+
+            bodyHTML += renderGroup('Químicos Farmacéuticos (QF)', qfWorkers);
+            bodyHTML += renderGroup('Técnicos en Farmacia (TEC)', tecWorkers);
+            bodyHTML += renderGroup('Digitadores (DIG)', digWorkers);
+
+            let footerHTML = `<tfoot class="bg-slate-100 font-bold border-t-2 border-slate-300">`;
+            
+            footerHTML += `<tr><td colspan="2" class="p-1.5 text-right uppercase text-purple-900 sticky-col bg-slate-100 text-[10px]">QFs en Guardia 12h:</td>`;
+            for (let d = 1; d <= totalDays; d++) {
+                let qfGuardiaCount = 0;
+                qfWorkers.forEach(w => {
+                    const shift = (shifts[w.id] || {})[d];
+                    if (shift === 'G12' || shift === 'M3') qfGuardiaCount++;
+                });
+                footerHTML += `<td class="p-1 font-mono text-center text-purple-700 ${qfGuardiaCount > 0 ? 'bg-purple-50' : ''}">${qfGuardiaCount}</td>`;
+            }
+            footerHTML += `<td class="bg-slate-200"></td></tr>`;
+
+            footerHTML += `<tr><td colspan="2" class="p-1.5 text-right uppercase text-sky-900 sticky-col bg-slate-100 text-[10px]">Técnicos Mañana M5 (8am-2pm):</td>`;
+            for (let d = 1; d <= totalDays; d++) {
+                let tecMananaCount = 0;
+                tecWorkers.forEach(w => {
+                    const shift = (shifts[w.id] || {})[d];
+                    if (shift === 'M5') tecMananaCount++;
+                });
+                footerHTML += `<td class="p-1 font-mono text-center text-sky-700 ${tecMananaCount > 0 ? 'bg-sky-50' : ''}">${tecMananaCount}</td>`;
+            }
+            footerHTML += `<td class="bg-slate-200"></td></tr></tfoot>`;
+
+            table.innerHTML = headerHTML + bodyHTML + footerHTML;
+        }
+
+        async function processAttendanceRegistration(worker, type, method) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+            
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timeStr = `${hours}:${minutes}:${seconds}`;
+
+            const allLogs = await db.getAttendanceLogs();
+            const todayLogsForWorker = allLogs.filter(l => {
+                const isSameWorker = (l.workerDni && l.workerDni === worker.dni) || 
+                                     (l.workerBarcode && l.workerBarcode === worker.barcode) ||
+                                     (l.workerName === worker.name);
+                const isToday = l.timestamp && l.timestamp.startsWith(todayStr);
+                return isSameWorker && isToday;
+            });
+
+            const hasEntryToday = todayLogsForWorker.some(l => l.type === 'ENTRADA');
+            const hasExitToday = todayLogsForWorker.some(l => l.type === 'SALIDA');
+
+            if (type === 'IN') {
+                if (hasEntryToday) {
+                    showToast(`Usted ya registró su ENTRADA el día de hoy (${worker.name}).`, false);
+                    showKioskWarningCard(worker, `Usted ya registró su ENTRADA el día de hoy a la fecha (${todayStr}).`);
+                    return;
+                }
+            } else if (type === 'OUT') {
+                if (!hasEntryToday) {
+                    showToast(`No puede marcar SALIDA sin haber registrado ENTRADA previamente.`, false);
+                    showKioskWarningCard(worker, `Denegado: No cuenta con registro de ENTRADA para el día de hoy (${todayStr}).`);
+                    return;
+                }
+                if (hasExitToday) {
+                    showToast(`Usted ya registró su SALIDA el día de hoy (${worker.name}).`, false);
+                    showKioskWarningCard(worker, `Usted ya registró su SALIDA el día de hoy a la fecha (${todayStr}).`);
+                    return;
+                }
+            }
+
+            const yearMonth = getYearMonthKey();
+            const shifts = await db.getMonthlyShifts(yearMonth);
+            const dayShift = (shifts[worker.id] || {})[now.getDate()] || 'Sin Turno Programado';
+
+            const log = {
+                timestamp: `${todayStr} ${timeStr}`,
+                workerName: worker.name,
+                workerDni: worker.dni || 'S/D',
+                workerBarcode: worker.barcode || 'S/C',
+                method: method,
+                type: type === 'IN' ? 'ENTRADA' : 'SALIDA',
+                shiftScheduled: dayShift
+            };
+
+            await db.addAttendanceLog(log);
+
+            renderScheduleTable();
+            if (!document.getElementById('view-reports').classList.contains('hidden')) {
+                loadAttendanceLogs();
+                renderAttendanceMetricsAndChart();
+            }
+
+            const resultCard = document.getElementById('kiosk-result-card');
+            const resultIcon = document.getElementById('kiosk-result-icon');
+            const resultName = document.getElementById('kiosk-result-name');
+            const resultDetail = document.getElementById('kiosk-result-detail');
+            const resultBadge = document.getElementById('kiosk-result-badge');
+
+            resultName.innerText = worker.name;
+            resultDetail.innerText = `${log.type} registrada a las ${timeStr} | Turno: ${dayShift} | Vía: ${method}`;
+
+            if (type === 'IN') {
+                resultCard.className = "p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-left animate-success";
+                resultIcon.className = "w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-xl text-white";
+                resultBadge.className = "px-2.5 py-1 rounded-lg font-extrabold text-xs uppercase bg-emerald-200 text-emerald-900";
+                resultBadge.innerText = "ENTRADA REGISTRADA";
+            } else {
+                resultCard.className = "p-4 rounded-2xl border border-rose-200 bg-rose-50 text-left animate-success";
+                resultIcon.className = "w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center text-xl text-white";
+                resultBadge.className = "px-2.5 py-1 rounded-lg font-extrabold text-xs uppercase bg-rose-200 text-rose-900";
+                resultBadge.innerText = "SALIDA REGISTRADA";
+            }
+
+            resultCard.classList.remove('hidden');
+            showToast(`¡Marcaje Exitoso! ${worker.name} - ${log.type}`, true);
+        }
+
+        function showKioskWarningCard(worker, message) {
+            const resultCard = document.getElementById('kiosk-result-card');
+            const resultIcon = document.getElementById('kiosk-result-icon');
+            const resultName = document.getElementById('kiosk-result-name');
+            const resultDetail = document.getElementById('kiosk-result-detail');
+            const resultBadge = document.getElementById('kiosk-result-badge');
+
+            resultName.innerText = worker.name;
+            resultDetail.innerText = message;
+            resultCard.className = "p-4 rounded-2xl border border-amber-300 bg-amber-50 text-left animate-success";
+            resultIcon.className = "w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-xl text-white";
+            resultBadge.className = "px-2.5 py-1 rounded-lg font-extrabold text-xs uppercase bg-amber-200 text-amber-900";
+            resultBadge.innerText = "MARCAJE DENEGADO";
+
+            resultCard.classList.remove('hidden');
+        }
+
+        function toggleAttendanceDateInputs() {
+            const mode = document.getElementById('attendance-filter-mode').value;
+            const singleBox = document.getElementById('attendance-single-date-box');
+            const rangeBox = document.getElementById('attendance-range-date-box');
+
+            if (mode === 'SINGLE') {
+                singleBox.classList.remove('hidden');
+                rangeBox.classList.add('hidden');
+            } else if (mode === 'RANGE') {
+                singleBox.classList.add('hidden');
+                rangeBox.classList.remove('hidden');
+            } else {
+                singleBox.classList.add('hidden');
+                rangeBox.classList.add('hidden');
+            }
+            loadAttendanceLogs();
+        }
+
+        function toggleMetricsDateInputs() {
+            const mode = document.getElementById('metrics-date-mode').value;
+            const rangeInputs = document.getElementById('metrics-range-inputs');
+            if (mode === 'RANGE') {
+                rangeInputs.classList.remove('hidden');
+            } else {
+                rangeInputs.classList.add('hidden');
+            }
+            renderAttendanceMetricsAndChart();
+        }
+
+        async function populateAttendanceWorkerFilter() {
+            const select = document.getElementById('attendance-worker-filter');
+            if (!select) return;
+            const workers = await db.getWorkers();
+            select.innerHTML = '<option value="ALL">-- Todo el Personal --</option>' + 
+                workers.map(w => `<option value="${w.id}">${escapeHTML(w.name)} (${w.role})</option>`).join('');
+        }
+
+        function setAttendanceFilterToday() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
+
+            const modeSelect = document.getElementById('attendance-filter-mode');
+            const input = document.getElementById('attendance-date-filter');
+            if (modeSelect) modeSelect.value = 'SINGLE';
+            toggleAttendanceDateInputs();
+            if (input) {
+                input.value = today;
+                loadAttendanceLogs();
+            }
+        }
+
+        async function loadAttendanceLogs() {
+            const logs = await db.getAttendanceLogs();
+            const workers = await db.getWorkers();
+
+            const workerFilterId = document.getElementById('attendance-worker-filter')?.value || 'ALL';
+            const mode = document.getElementById('attendance-filter-mode')?.value || 'SINGLE';
+            
+            const filterDate = document.getElementById('attendance-date-filter')?.value || '';
+            const startDate = document.getElementById('attendance-start-date')?.value || '';
+            const endDate = document.getElementById('attendance-end-date')?.value || '';
+
+            const tbody = document.getElementById('attendance-logs-body');
+            if (!tbody) return;
+
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400 font-semibold">No hay marcas de asistencia registradas en el sistema.</td></tr>';
+                return;
+            }
+
+            let filteredLogs = logs;
+
+            if (workerFilterId !== 'ALL') {
+                const selectedWorker = workers.find(w => w.id === workerFilterId);
+                if (selectedWorker) {
+                    filteredLogs = filteredLogs.filter(l => 
+                        (l.workerDni && l.workerDni === selectedWorker.dni) || 
+                        (l.workerBarcode && l.workerBarcode === selectedWorker.barcode) ||
+                        (l.workerName === selectedWorker.name)
+                    );
+                }
+            }
+
+            if (mode === 'SINGLE' && filterDate) {
+                filteredLogs = filteredLogs.filter(l => l.timestamp && l.timestamp.startsWith(filterDate));
+            } else if (mode === 'RANGE' && startDate && endDate) {
+                filteredLogs = filteredLogs.filter(l => {
+                    const logDate = l.timestamp ? l.timestamp.split(' ')[0] : '';
+                    return logDate >= startDate && logDate <= endDate;
+                });
+            }
+
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 font-semibold">No se encontraron marcas para el filtro seleccionado.</td></tr>`;
+                return;
+            }
+
+            const grouped = {};
+
+            filteredLogs.forEach(l => {
+                const parts = l.timestamp.split(' ');
+                const datePart = parts[0];
+                const timePart = parts[1] || '';
+                const workerKey = l.workerDni || l.workerBarcode || l.workerName;
+                const groupKey = `${datePart}_${workerKey}`;
+
+                if (!grouped[groupKey]) {
+                    grouped[groupKey] = {
+                        date: datePart,
+                        workerName: l.workerName,
+                        workerDni: l.workerDni || '-',
+                        workerBarcode: l.workerBarcode || '-',
+                        shiftScheduled: l.shiftScheduled || 'OFF',
+                        inLog: null,
+                        outLog: null
+                    };
+                }
+
+                if (l.type === 'ENTRADA' && !grouped[groupKey].inLog) {
+                    grouped[groupKey].inLog = { time: timePart, method: l.method, fullLog: l };
+                } else if (l.type === 'SALIDA') {
+                    grouped[groupKey].outLog = { time: timePart, method: l.method, fullLog: l };
+                }
+            });
+
+            const rows = Object.values(grouped).sort((a, b) => b.date.localeCompare(a.date));
+
+            tbody.innerHTML = rows.map(r => {
+                let inHTML = '<span class="text-slate-400 italic">Sin Entrada</span>';
+                let statusBadge = '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold text-[10px]">Sin Registro</span>';
+
+                if (r.inLog) {
+                    const shiftCode = r.shiftScheduled;
+                    const shiftConfig = SHIFT_ENTRY_TIMES[shiftCode] || { hour: 8, minute: 0 };
+                    const [h, m] = r.inLog.time.split(':').map(Number);
+                    const markedMins = (h || 0) * 60 + (m || 0);
+                    const maxAllowedMins = shiftConfig.hour * 60 + shiftConfig.minute + 5;
+
+                    if (shiftCode && shiftCode !== 'OFF' && shiftCode !== 'FER' && shiftCode !== 'VAC') {
+                        if (markedMins <= maxAllowedMins) {
+                            statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">🟢 Puntual</span>';
+                        } else {
+                            statusBadge = '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">🟡 Tardanza</span>';
+                        }
+                    } else {
+                        statusBadge = '<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">Registrado</span>';
+                    }
+
+                    inHTML = `<span class="font-mono font-bold text-emerald-700 text-xs"><i class="fa-regular fa-clock mr-1"></i>${escapeHTML(r.inLog.time)}</span>`;
+                }
+
+                let outHTML = '<span class="text-slate-400 italic">Pendiente</span>';
+                if (r.outLog) {
+                    outHTML = `<span class="font-mono font-bold text-rose-700 text-xs"><i class="fa-regular fa-clock mr-1"></i>${escapeHTML(r.outLog.time)}</span>`;
+                }
+
+                const methodUsed = r.inLog?.method || r.outLog?.method || 'KIOSCO';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="p-3 font-mono font-bold text-slate-700">${escapeHTML(r.date)}</td>
+                        <td class="p-3 font-bold text-slate-800">${escapeHTML(r.workerName)}</td>
+                        <td class="p-3 font-mono text-slate-500">${escapeHTML(r.workerDni)} / ${escapeHTML(r.workerBarcode)}</td>
+                        <td class="p-3 font-mono font-bold text-slate-700">${escapeHTML(r.shiftScheduled)}</td>
+                        <td class="p-3 text-center bg-emerald-50/50 border-x border-emerald-100">${inHTML}</td>
+                        <td class="p-3 text-center bg-rose-50/50 border-r border-rose-100">${outHTML}</td>
+                        <td class="p-3 text-center">
+                            <div class="flex flex-col items-center gap-1">
+                                ${statusBadge}
+                                <span class="text-[10px] text-slate-400 font-medium">${escapeHTML(methodUsed)}</span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function populateMetricsWorkerSelect() {
+            const select = document.getElementById('metrics-worker-select');
+            if (!select) return;
+            const workers = await db.getWorkers();
+            
+            let html = '<option value="ALL">-- Todo el Equipo / Todo el Personal --</option>';
+            html += workers.map(w => `<option value="${w.id}">${escapeHTML(w.name)} (${w.role})</option>`).join('');
+            
+            select.innerHTML = html;
+        }
+
+        async function renderAttendanceMetricsAndChart() {
+            const selectedWorkerId = document.getElementById('metrics-worker-select')?.value || 'ALL';
+            const dateMode = document.getElementById('metrics-date-mode')?.value || 'MONTH';
+            
+            const startDateVal = document.getElementById('metrics-start-date')?.value || '';
+            const endDateVal = document.getElementById('metrics-end-date')?.value || '';
+
+            const workers = await db.getWorkers();
+            const allShifts = await db.getAllShifts();
+            const attendanceLogs = await db.getAttendanceLogs();
+
+            let targetWorkers = selectedWorkerId === 'ALL' ? workers : workers.filter(w => w.id === selectedWorkerId);
+
+            let punctualCount = 0;
+            let lateCount = 0;
+            let absentCount = 0;
+            let totalEvaluated = 0;
+
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            targetWorkers.forEach(worker => {
+                if (dateMode === 'MONTH') {
+                    const yearMonth = getYearMonthKey();
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    const totalDays = new Date(year, month + 1, 0).getDate();
+                    const monthShifts = (allShifts[yearMonth] || {})[worker.id] || {};
+
+                    for (let d = 1; d <= totalDays; d++) {
+                        const monthStr = String(month + 1).padStart(2, '0');
+                        const dayStr = String(d).padStart(2, '0');
+                        const dateKey = `${year}-${monthStr}-${dayStr}`;
+
+                        if (dateKey > todayStr) continue;
+
+                        const shiftCode = monthShifts[d] || '';
+                        let displayCode = shiftCode;
+                        const statusObj = getAttendanceStatus(worker, dateKey, displayCode, attendanceLogs);
+
+                        if (statusObj) {
+                            totalEvaluated++;
+                            if (statusObj.status === 'PUNCTUAL') punctualCount++;
+                            else if (statusObj.status === 'LATE') lateCount++;
+                            else if (statusObj.status === 'ABSENT') absentCount++;
+                        }
+                    }
+                } else if (dateMode === 'RANGE' && startDateVal && endDateVal) {
+                    let curr = new Date(startDateVal + 'T00:00:00');
+                    const last = new Date(endDateVal + 'T00:00:00');
+
+                    while (curr <= last) {
+                        const year = curr.getFullYear();
+                        const month = curr.getMonth();
+                        const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+                        const day = curr.getDate();
+                        const dateKey = curr.toISOString().split('T')[0];
+
+                        if (dateKey <= todayStr) {
+                            const monthShifts = (allShifts[yearMonth] || {})[worker.id] || {};
+                            const shiftCode = monthShifts[day] || '';
+                            let displayCode = shiftCode;
+                            const statusObj = getAttendanceStatus(worker, dateKey, displayCode, attendanceLogs);
+
+                            if (statusObj) {
+                                totalEvaluated++;
+                                if (statusObj.status === 'PUNCTUAL') punctualCount++;
+                                else if (statusObj.status === 'LATE') lateCount++;
+                                else if (statusObj.status === 'ABSENT') absentCount++;
+                            }
+                        }
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                } else if (dateMode === 'ALL') {
+                    Object.keys(allShifts).forEach(yearMonth => {
+                        const [y, m] = yearMonth.split('-').map(Number);
+                        const totalDays = new Date(y, m, 0).getDate();
+                        const monthShifts = (allShifts[yearMonth] || {})[worker.id] || {};
+
+                        for (let d = 1; d <= totalDays; d++) {
+                            const dateKey = `${yearMonth}-${String(d).padStart(2, '0')}`;
+                            if (dateKey <= todayStr) {
+                                const shiftCode = monthShifts[d] || '';
+                                let displayCode = shiftCode;
+                                const statusObj = getAttendanceStatus(worker, dateKey, displayCode, attendanceLogs);
+
+                                if (statusObj) {
+                                    totalEvaluated++;
+                                    if (statusObj.status === 'PUNCTUAL') punctualCount++;
+                                    else if (statusObj.status === 'LATE') lateCount++;
+                                    else if (statusObj.status === 'ABSENT') absentCount++;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+
+            const punctualPct = totalEvaluated > 0 ? Math.round((punctualCount / totalEvaluated) * 100) : 0;
+            const latePct = totalEvaluated > 0 ? Math.round((lateCount / totalEvaluated) * 100) : 0;
+            const absentPct = totalEvaluated > 0 ? Math.round((absentCount / totalEvaluated) * 100) : 0;
+
+            document.getElementById('metric-punctual-pct').innerText = `${punctualPct}%`;
+            document.getElementById('metric-punctual-count').innerText = `${punctualCount} de ${totalEvaluated} turnos`;
+
+            document.getElementById('metric-late-pct').innerText = `${latePct}%`;
+            document.getElementById('metric-late-count').innerText = `${lateCount} de ${totalEvaluated} turnos`;
+
+            document.getElementById('metric-absent-pct').innerText = `${absentPct}%`;
+            document.getElementById('metric-absent-count').innerText = `${absentCount} de ${totalEvaluated} turnos`;
+
+            const sanctionBox = document.getElementById('sanction-status-box');
+            const sanctionTitle = document.getElementById('sanction-title');
+            const sanctionDesc = document.getElementById('sanction-description');
+            const sanctionIconBg = document.getElementById('sanction-icon-bg');
+            const sanctionIcon = document.getElementById('sanction-icon');
+
+            const workerNameText = selectedWorkerId === 'ALL' ? 'El Personal Evaluado' : workers.find(w => w.id === selectedWorkerId)?.name || 'El colaborador';
+
+            if (absentCount >= 1 || lateCount >= 3) {
+                sanctionBox.className = "p-4 rounded-2xl border transition-all flex items-start gap-3 bg-rose-50 border-rose-300 text-rose-900";
+                sanctionIconBg.className = "p-2.5 rounded-xl text-white bg-rose-600";
+                sanctionIcon.className = "fa-solid fa-triangle-exclamation text-xl";
+                sanctionTitle.innerText = "ALERTA: APLICA AMONESTACIÓN ESCRITA / MEMORÁNDUM";
+                sanctionDesc.innerText = `${workerNameText} acumula ${lateCount} tardanza(s) y ${absentCount} falta(s) en el rango de fechas evaluado. Corresponde emitir sanción disciplinaria.`;
+            } else if (lateCount > 0) {
+                sanctionBox.className = "p-4 rounded-2xl border transition-all flex items-start gap-3 bg-amber-50 border-amber-300 text-amber-900";
+                sanctionIconBg.className = "p-2.5 rounded-xl text-white bg-amber-600";
+                sanctionIcon.className = "fa-solid fa-clock text-xl";
+                sanctionTitle.innerText = "PRECAUCIÓN: REGISTRA TARDANZAS LEVES";
+                sanctionDesc.innerText = `${workerNameText} acumula ${lateCount} tardanza(s). Superar 3 tardanzas generará llamada de atención formal.`;
+            } else {
+                sanctionBox.className = "p-4 rounded-2xl border transition-all flex items-start gap-3 bg-emerald-50 border-emerald-300 text-emerald-900";
+                sanctionIconBg.className = "p-2.5 rounded-xl text-white bg-emerald-600";
+                sanctionIcon.className = "fa-solid fa-shield-check text-xl";
+                sanctionTitle.innerText = "ESTADO PUNTUAL Y REGLAMENTARIO";
+                sanctionDesc.innerText = `${workerNameText} mantiene un registro impecable sin demoras ni inasistencias en este rango.`;
+            }
+
+            renderChart(punctualCount, lateCount, absentCount);
+        }
+
+        function renderChart(punctual, late, absent) {
+            const ctx = document.getElementById('attendanceChart')?.getContext('2d');
+            if (!ctx) return;
+
+            if (attendanceChartInstance) {
+                attendanceChartInstance.destroy();
+            }
+
+            const total = punctual + late + absent;
+            const dataValues = total === 0 ? [0, 0, 0, 1] : [punctual, late, absent, 0];
+            const bgColors = total === 0 
+                ? ['#059669', '#d97706', '#dc2626', '#cbd5e1']
+                : ['#059669', '#d97706', '#dc2626', '#e2e8f0'];
+
+            attendanceChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Puntual', 'Tardanzas', 'Faltas', 'Sin Datos'],
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: bgColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        async function loadKioskWorkers() {
+            const select = document.getElementById('kiosk-manual-worker-select');
+            if (!select) return;
+            const workers = await db.getWorkers();
+            select.innerHTML = workers.map(w => `<option value="${w.id}">${escapeHTML(w.name)} - ${w.role}</option>`).join('');
+        }
+
+        async function renderWorkerManagementList() {
+            const tbody = document.getElementById('worker-management-body');
+            if (!tbody) return;
+
+            const workers = await db.getWorkers();
+            const pavilions = await db.getPavilions();
+            const searchVal = (document.getElementById('worker-search-input')?.value || '').toLowerCase();
+
+            const filtered = workers.filter(w => 
+                w.name.toLowerCase().includes(searchVal) ||
+                (w.dni && w.dni.includes(searchVal)) ||
+                (w.barcode && w.barcode.toLowerCase().includes(searchVal))
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-400 font-semibold">No se encontraron trabajadores.</td></tr>';
+                return;
+            }
+
+            let html = '';
+
+            filtered.forEach((w, i) => {
+                const pav = pavilions.find(p => p.id === w.pavilionId);
+                
+                // Formatear la vista detallada de Pabellón, Subpabellones y Camas
+                let pavilionDetailHTML = '';
+                if (pav) {
+                    let subListHTML = '';
+                    let totalBedsAssigned = 0;
+
+                    if (w.pavilionScope === 'SUB' && w.assignedSubpavilions?.length > 0) {
+                        // Filtrar solo los subpabellones que tiene asignados el trabajador
+                        const assignedSubs = pav.subpavilions.filter(sub => w.assignedSubpavilions.includes(sub.name));
+                        
+                        subListHTML = assignedSubs.map(sub => {
+                            const bedCount = (sub.endBed - sub.startBed + 1);
+                            totalBedsAssigned += bedCount;
+                            return `<li class="flex justify-between items-center bg-white p-2 rounded-lg border border-teal-200">
+                                        <div>
+                                            <span class="font-bold text-slate-800">${escapeHTML(sub.name)}</span>
+                                            <span class="text-xs text-slate-500 block">Camas: ${sub.startBed} al ${sub.endBed}</span>
+                                        </div>
+                                        <span class="px-2 py-0.5 bg-teal-100 text-teal-800 rounded font-mono font-bold text-[10px]">${bedCount} camas</span>
+                                    </li>`;
+                        }).join('');
+                    } else {
+                        // Pabellón Completo
+                        subListHTML = pav.subpavilions.map(sub => {
+                            const bedCount = (sub.endBed - sub.startBed + 1);
+                            totalBedsAssigned += bedCount;
+                            return `<li class="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-200">
+                                        <div>
+                                            <span class="font-bold text-slate-800">${escapeHTML(sub.name)}</span>
+                                            <span class="text-xs text-slate-500 block">Camas: ${sub.startBed} al ${sub.endBed}</span>
+                                        </div>
+                                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-mono font-bold text-[10px]">${bedCount} camas</span>
+                                    </li>`;
+                        }).join('');
+                    }
+
+                    pavilionDetailHTML = `
+                        <div class="p-4 bg-teal-50 border-l-4 border-teal-500 rounded-r-xl space-y-3">
+                            <div class="flex items-center justify-between border-b border-teal-200 pb-2">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-hospital-bed text-teal-600 text-lg"></i>
+                                    <div>
+                                        <h4 class="font-bold text-sm text-teal-950">${escapeHTML(pav.name)}</h4>
+                                        <p class="text-xs text-teal-700">${escapeHTML(pav.entity)} — Alcance: <span class="font-bold">${w.pavilionScope === 'SUB' ? 'Subpabellones Específicos' : 'Pabellón Completo'}</span></p>
+                                    </div>
+                                </div>
+                                <div class="bg-teal-600 text-white font-bold text-xs px-3 py-1 rounded-xl shadow-xs">
+                                    Total Aprox.: ${totalBedsAssigned} Camas
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-bold text-teal-900 uppercase tracking-wide block mb-1.5">Subpabellones y Rango de Camas Asignados:</span>
+                                <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                    ${subListHTML || '<li class="text-slate-400 italic">Sin subpabellones detallados</li>'}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    pavilionDetailHTML = `
+                        <div class="p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl text-amber-800 text-xs font-semibold flex items-center gap-2">
+                            <i class="fa-solid fa-circle-exclamation text-amber-500 text-base"></i>
+                            Este colaborador no tiene ningún pabellón ni camas asignadas en el sistema.
+                        </div>
+                    `;
+                }
+
+                // Fila Principal del Trabajador
+                html += `
+                    <tr onclick="toggleWorkerDetail('${w.id}')" class="hover:bg-slate-50 transition cursor-pointer select-none">
+                        <td class="p-3 text-center font-mono text-slate-400">${i + 1}</td>
+                        <td class="p-3 font-bold text-slate-800 flex items-center gap-2">
+                            <i id="icon-chevron-${w.id}" class="fa-solid fa-chevron-right text-xs text-slate-400 transition-transform duration-200"></i>
+                            ${escapeHTML(w.name)}
+                        </td>
+                        <td class="p-3 font-mono text-slate-600">${escapeHTML(w.dni || '-')}</td>
+                        <td class="p-3 font-mono font-bold text-slate-700">${escapeHTML(w.barcode || '-')}</td>
+                        <td class="p-3 font-bold text-xs">
+                            <span class="px-2 py-1 rounded-lg ${w.role === 'QF' ? 'bg-purple-100 text-purple-800' : (w.role === 'TEC' ? 'bg-sky-100 text-sky-800' : 'bg-blue-100 text-blue-800')}">
+                                ${escapeHTML(w.role)}
+                            </span>
+                        </td>
+                        <td class="p-3 text-slate-700 font-medium">${pav ? escapeHTML(pav.name) : '<span class="text-slate-400 italic">Sin Asignar</span>'}</td>
+                        <td class="p-3 text-center font-mono font-bold text-slate-700">${w.targetHours || 150}h</td>
+                        <td class="p-3 text-center space-x-1" onclick="event.stopPropagation()">
+                            <button onclick="editWorkerById('${w.id}')" class="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg transition" title="Editar">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="openDeleteModal('${w.id}')" class="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg transition" title="Eliminar">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <!-- Fila Desplegable de Detalle (Oculta por defecto) -->
+                    <tr id="detail-${w.id}" class="hidden bg-slate-50/70">
+                        <td colspan="8" class="p-3 pl-8">
+                            ${pavilionDetailHTML}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function toggleWorkerDetail(workerId) {
+            const detailRow = document.getElementById(`detail-${workerId}`);
+            const chevronIcon = document.getElementById(`icon-chevron-${workerId}`);
+
+            if (detailRow) {
+                const isHidden = detailRow.classList.contains('hidden');
+                if (isHidden) {
+                    detailRow.classList.remove('hidden');
+                    if (chevronIcon) chevronIcon.classList.add('rotate-90', 'text-teal-600');
+                } else {
+                    detailRow.classList.add('hidden');
+                    if (chevronIcon) chevronIcon.classList.remove('rotate-90', 'text-teal-600');
+                }
+            }
+        }
+
+        function renderPavilionsGrid() {
+            const grid = document.getElementById('pavilions-grid');
+            if (!grid) return;
+
+            db.getPavilions().then(pavilions => {
+                if (pavilions.length === 0) {
+                    grid.innerHTML = '<p class="text-slate-400 font-semibold col-span-full text-center py-8">No hay pabellones registrados.</p>';
+                    return;
+                }
+
+                grid.innerHTML = pavilions.map(p => {
+                    // Calcular total de camas del pabellón sumando los rangos
+                    let totalBeds = 0;
+                    const subpHtml = (p.subpavilions || []).map(sp => {
+                        const count = (sp.endBed - sp.startBed) + 1;
+                        totalBeds += count > 0 ? count : 0;
+                        return `
+                            <div class="subpavilion-item flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-door-open text-teal-600"></i>
+                                    <span class="font-bold text-slate-700">${escapeHTML(sp.name)}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="subpavilion-bed-badge">
+                                        <i class="fa-solid fa-bed text-[9px] mr-1"></i>Camas ${sp.startBed} al ${sp.endBed} (${count})
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="pavilion-card p-5 flex flex-col justify-between space-y-4">
+                            <div>
+                                <!-- Encabezado con Entidad y Nombre -->
+                                <div class="flex justify-between items-start mb-2 gap-2">
+                                    <span class="pavilion-entity-tag">
+                                        <i class="fa-solid fa-building-hospital mr-1"></i>${escapeHTML(p.entity)}
+                                    </span>
+                                    <!-- Sticker de Total de Camas -->
+                                    <span class="bed-sticker">
+                                        <i class="fa-solid fa-bed"></i> ${totalBeds} Camas Total
+                                    </span>
+                                </div>
+
+                                <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-tight flex items-center gap-2 mt-1">
+                                    <i class="fa-solid fa-hospital-user text-teal-600"></i>
+                                    ${escapeHTML(p.name)}
+                                </h3>
+
+                                <!-- Lista de Subpabellones con Stickers -->
+                                <div class="mt-4 space-y-2">
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subpabellones / Salas:</p>
+                                    <div class="space-y-1.5">
+                                        ${subpHtml || '<p class="text-xs text-slate-400 italic">Sin subpabellones configurados</p>'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botones de Acción -->
+                            <div class="flex justify-end gap-2 border-t pt-3 border-slate-100">
+                                <button onclick="editPavilion('${p.id}')" class="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 rounded-lg transition flex items-center gap-1">
+                                    <i class="fa-solid fa-pen-to-square"></i> Editar
+                                </button>
+                                <button onclick="deletePavilion('${p.id}')" class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition flex items-center gap-1">
+                                    <i class="fa-solid fa-trash-can"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            });
+        }
+
+        function openShiftPicker(workerId, day, currentShift) {
+            activeCellTarget = { workerId, day };
+            document.getElementById('picker-title-date').innerText = `Día ${day} - Mes Seleccionado`;
+            document.getElementById('modal-shift-picker').classList.remove('hidden');
+        }
+
+        function closeShiftPicker() {
+            activeCellTarget = null;
+            document.getElementById('modal-shift-picker').classList.add('hidden');
+        }
+
+        async function assignSelectedShift(shiftCode) {
+            if (!activeCellTarget) return;
+            const yearMonth = getYearMonthKey();
+            await db.saveShift(yearMonth, activeCellTarget.workerId, activeCellTarget.day, shiftCode);
+            closeShiftPicker();
+            renderScheduleTable();
+        }
+
+        async function openWorkerModal(worker = null) {
+            const pavilions = await db.getPavilions();
+            const pavSelect = document.getElementById('w-pavilion');
+            
+            pavSelect.innerHTML = '<option value="">-- Sin Pabellón Asignado --</option>' + 
+                pavilions.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+
+            if (worker) {
+                document.getElementById('modal-worker-title').innerText = "Editar Integrante";
+                document.getElementById('w-id').value = worker.id;
+                document.getElementById('w-name').value = worker.name;
+                document.getElementById('w-dni').value = worker.dni || '';
+                document.getElementById('w-barcode').value = worker.barcode || '';
+                document.getElementById('w-role').value = worker.role || 'QF';
+                document.getElementById('w-pavilion').value = worker.pavilionId || '';
+
+                handleWorkerPavilionChange();
+
+                if (worker.pavilionId) {
+                    const scope = worker.pavilionScope || 'FULL';
+                    const scopeRadio = document.querySelector(`input[name="w-pavilion-scope"][value="${scope}"]`);
+                    if (scopeRadio) scopeRadio.checked = true;
+                    handleWorkerScopeChange();
+
+                    if (scope === 'SUB' && worker.assignedSubpavilions) {
+                        setTimeout(() => {
+                            worker.assignedSubpavilions.forEach(sName => {
+                                const chk = document.querySelector(`input[name="w-subpav-check"][value="${sName}"]`);
+                                if (chk) chk.checked = true;
+                            });
+                        }, 50);
+                    }
+                }
+            } else {
+                document.getElementById('modal-worker-title').innerText = "Agregar Nuevo Integrante";
+                document.getElementById('w-id').value = '';
+                document.getElementById('w-name').value = '';
+                document.getElementById('w-dni').value = '';
+                document.getElementById('w-barcode').value = '';
+                document.getElementById('w-role').value = 'QF';
+                document.getElementById('w-pavilion').value = '';
+                handleWorkerPavilionChange();
+            }
+
+            document.getElementById('modal-worker').classList.remove('hidden');
+        }
+
+        function closeWorkerModal() {
+            document.getElementById('modal-worker').classList.add('hidden');
+        }
+
+        async function handleWorkerPavilionChange() {
+            const pavId = document.getElementById('w-pavilion').value;
+            const scopeContainer = document.getElementById('w-scope-container');
+            const subListDiv = document.getElementById('w-subpavilions-list');
+
+            if (!pavId) {
+                scopeContainer.classList.add('hidden');
+                return;
+            }
+
+            scopeContainer.classList.remove('hidden');
+            const pavilions = await db.getPavilions();
+            const pav = pavilions.find(p => p.id === pavId);
+
+            if (pav && pav.subpavilions && pav.subpavilions.length > 0) {
+                subListDiv.innerHTML = pav.subpavilions.map(s => `
+                    <label class="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer">
+                        <input type="checkbox" name="w-subpav-check" value="${escapeHTML(s.name)}" class="rounded text-blue-600">
+                        <span>${escapeHTML(s.name)} (Camas ${s.startBed}-${s.endBed})</span>
+                    </label>
+                `).join('');
+            } else {
+                subListDiv.innerHTML = '<p class="text-[11px] text-slate-400 italic">Este pabellón no tiene subpabellones creados.</p>';
+            }
+
+            handleWorkerScopeChange();
+        }
+
+        function handleWorkerScopeChange() {
+            const scope = document.querySelector('input[name="w-pavilion-scope"]:checked')?.value || 'FULL';
+            const subSelector = document.getElementById('w-subpavilions-selector');
+
+            if (scope === 'SUB') {
+                subSelector.classList.remove('hidden');
+            } else {
+                subSelector.classList.add('hidden');
+            }
+        }
+
+        async function saveWorkerForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('w-id').value;
+            const name = document.getElementById('w-name').value.trim();
+            const dni = document.getElementById('w-dni').value.trim();
+            const barcode = document.getElementById('w-barcode').value.trim().toUpperCase();
+            const role = document.getElementById('w-role').value;
+            const pavilionId = document.getElementById('w-pavilion').value;
+
+            let pavilionScope = 'FULL';
+            let assignedSubpavilions = [];
+
+            if (pavilionId) {
+                pavilionScope = document.querySelector('input[name="w-pavilion-scope"]:checked')?.value || 'FULL';
+                if (pavilionScope === 'SUB') {
+                    const checkboxes = document.querySelectorAll('input[name="w-subpav-check"]:checked');
+                    assignedSubpavilions = Array.from(checkboxes).map(c => c.value);
+                }
+            }
+
+            const worker = {
+                id: id || undefined,
+                name,
+                dni,
+                barcode,
+                role,
+                targetHours: 150,
+                pavilionId,
+                pavilionScope,
+                assignedSubpavilions
+            };
+
+            await db.saveWorker(worker);
+            closeWorkerModal();
+            showToast("Datos de personal guardados correctamente.");
+            renderScheduleTable();
+            renderWorkerManagementList();
+            loadKioskWorkers();
+        }
+
+        function openDeleteModal(id) {
+            workerToDeleteId = id;
+            document.getElementById('modal-confirm-delete').classList.remove('hidden');
+            document.getElementById('btn-confirm-delete-action').onclick = confirmDeleteWorker;
+        }
+
+        function closeDeleteModal() {
+            workerToDeleteId = null;
+            document.getElementById('modal-confirm-delete').classList.add('hidden');
+        }
+
+        async function confirmDeleteWorker() {
+            if (workerToDeleteId) {
+                await db.deleteWorker(workerToDeleteId);
+                closeDeleteModal();
+                showToast("Personal eliminado.");
+                renderScheduleTable();
+                renderWorkerManagementList();
+                loadKioskWorkers();
+            }
+        }
+
+        async function openVacationModal() {
+            const workers = await db.getWorkers();
+            const select = document.getElementById('vac-worker-select');
+            select.innerHTML = workers.map(w => `<option value="${w.id}">${escapeHTML(w.name)} (${w.role})</option>`).join('');
+            document.getElementById('modal-vacation').classList.remove('hidden');
+        }
+
+        function closeVacationModal() {
+            document.getElementById('modal-vacation').classList.add('hidden');
+        }
+
+        async function saveVacationForm(e) {
+            e.preventDefault();
+            const workerId = document.getElementById('vac-worker-select').value;
+            const startDay = parseInt(document.getElementById('vac-start-day').value) || 1;
+            const duration = parseInt(document.getElementById('vac-duration').value) || 30;
+
+            const yearMonth = getYearMonthKey();
+            await db.saveVacationPeriod(yearMonth, workerId, startDay, duration);
+
+            closeVacationModal();
+            showToast("Vacaciones programadas exitosamente.");
+            renderScheduleTable();
+        }
+
+        function openAutoGenerateModal() {
+            document.getElementById('modal-autogen').classList.remove('hidden');
+        }
+
+        function closeAutoGenerateModal() {
+            document.getElementById('modal-autogen').classList.add('hidden');
+        }
+
+        // =========================================================================
+        // NUCLEO LÓGICA DE AUTO-GENERACIÓN POR SEPARADO DE CADA PROFESIÓN
+        // =========================================================================
+        async function executeAutoGenerationByRole(targetRole) {
+            const yearMonth = getYearMonthKey();
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            const workers = await db.getWorkers();
+            const holidays = await db.getHolidays();
+            const allShifts = JSON.parse(localStorage.getItem(db.STORAGE_KEYS.SHIFTS) || '{}');
+            
+            if (!allShifts[yearMonth]) allShifts[yearMonth] = {};
+
+            const roleWorkers = workers.filter(w => w.role === targetRole);
+
+            if (roleWorkers.length === 0) {
+                showToast(`No hay trabajadores registrados en la profesión ${targetRole}.`, false);
+                return;
+            }
+
+            const keepVacation = document.getElementById('autogen-clear-existing')?.checked ?? true;
+
+            // Limpiar turnos previos solo del rol seleccionado
+            roleWorkers.forEach(w => {
+                const prev = allShifts[yearMonth][w.id] || {};
+                const newShifts = {};
+                if (keepVacation) {
+                    for (let d = 1; d <= totalDays; d++) {
+                        if (prev[d] === 'VAC') newShifts[d] = 'VAC';
+                    }
+                }
+                allShifts[yearMonth][w.id] = newShifts;
+            });
+
+            // ---------------------------------------------------------------------
+            // 1. GENERACIÓN INDEPENDIENTE PARA QUÍMICOS FARMACÉUTICOS (QF)
+            // ---------------------------------------------------------------------
+            if (targetRole === 'QF') {
+                const qfList = roleWorkers;
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const dayDate = new Date(year, month, d);
+                    const isSunday = dayDate.getDay() === 0;
+                    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const isHoliday = !!holidays[dateKey];
+
+                    if (isSunday || isHoliday) {
+                        // Dom/Fer: 1 QF Guardia G12 y 2 QF Turno Mañana M5
+                        let available = qfList.filter(w => !allShifts[yearMonth][w.id][d]);
+                        
+                        if (available.length > 0) {
+                            // Asignar 1 Guardia G12 (el que tenga menos horas acumuladas)
+                            available.sort((a,b) => getHoursCount(allShifts[yearMonth][a.id]) - getHoursCount(allShifts[yearMonth][b.id]));
+                            const g12Worker = available.shift();
+                            allShifts[yearMonth][g12Worker.id][d] = 'G12';
+
+                            // Aplicar descansos post-guardia en día siguiente si aplica
+                            if (d + 1 <= totalDays && !allShifts[yearMonth][g12Worker.id][d+1]) {
+                                allShifts[yearMonth][g12Worker.id][d+1] = 'OFF';
+                            }
+
+                            // Asignar 2 Mañanas M5
+                            for (let i = 0; i < 2 && available.length > 0; i++) {
+                                const m5Worker = available.shift();
+                                allShifts[yearMonth][m5Worker.id][d] = 'M5';
+                            }
+                        }
+                    } else {
+                        // Lunes a Sábado: 3 QF en Guardia Diaria G12 (7am - 7pm)
+                        let available = qfList.filter(w => !allShifts[yearMonth][w.id][d]);
+                        
+                        // Ordenar por menor cantidad de horas acumuladas para rotar equitativamente
+                        available.sort((a,b) => getHoursCount(allShifts[yearMonth][a.id]) - getHoursCount(allShifts[yearMonth][b.id]));
+
+                        const assignedG12 = [];
+                        for (let i = 0; i < 3 && available.length > 0; i++) {
+                            const w = available.shift();
+                            allShifts[yearMonth][w.id][d] = 'G12';
+                            assignedG12.push(w);
+
+                            // Post-Guardia
+                            if (d + 1 <= totalDays && !allShifts[yearMonth][w.id][d+1]) {
+                                allShifts[yearMonth][w.id][d+1] = 'OFF';
+                            }
+                        }
+
+                        // QF sin guardia realiza Turno Mañana M5
+                        available.forEach(w => {
+                            if (!allShifts[yearMonth][w.id][d]) {
+                                allShifts[yearMonth][w.id][d] = 'M5';
+                            }
+                        });
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------------
+            // 2. GENERACIÓN INDEPENDIENTE PARA TÉCNICOS EN FARMACIA (TEC)
+            // ---------------------------------------------------------------------
+            else if (targetRole === 'TEC') {
+                const tecList = roleWorkers;
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const dayDate = new Date(year, month, d);
+                    const isSunday = dayDate.getDay() === 0;
+                    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const isHoliday = !!holidays[dateKey];
+
+                    if (isSunday || isHoliday) {
+                        // Dom/Fer: 1 Técnico de apoyo Turno Tarde D3 (1pm-7pm / 6h rotativo)
+                        let available = tecList.filter(w => !allShifts[yearMonth][w.id][d]);
+                        available.sort((a,b) => getHoursCount(allShifts[yearMonth][a.id]) - getHoursCount(allShifts[yearMonth][b.id]));
+
+                        if (available.length > 0) {
+                            const tecApoyo = available.shift();
+                            allShifts[yearMonth][tecApoyo.id][d] = 'D3';
+
+                            // Descanso Compensatorio aleatorio en la misma semana si no excede
+                            for (let targetD = d + 1; targetD <= Math.min(totalDays, d + 6); targetD++) {
+                                const targetDate = new Date(year, month, targetD);
+                                const isTargetSun = targetDate.getDay() === 0;
+                                if (!isTargetSun && !allShifts[yearMonth][tecApoyo.id][targetD]) {
+                                    allShifts[yearMonth][tecApoyo.id][targetD] = 'OFF';
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        // Lunes a Sábado: Turno Normal Mañana M5 (8am - 2pm / 6h)
+                        tecList.forEach(w => {
+                            if (!allShifts[yearMonth][w.id][d]) {
+                                allShifts[yearMonth][w.id][d] = 'M5';
+                            }
+                        });
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------------
+            // 3. GENERACIÓN INDEPENDIENTE PARA DIGITADORES (DIG)
+            // ---------------------------------------------------------------------
+            else if (targetRole === 'DIG') {
+                const digList = roleWorkers;
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const dayDate = new Date(year, month, d);
+                    const isSunday = dayDate.getDay() === 0;
+                    const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const isHoliday = !!holidays[dateKey];
+
+                    let available = digList.filter(w => !allShifts[yearMonth][w.id][d]);
+                    available.sort((a,b) => getHoursCount(allShifts[yearMonth][a.id]) - getHoursCount(allShifts[yearMonth][b.id]));
+
+                    if (isSunday || isHoliday) {
+                        // Dom/Fer: 1 Digitador Guardia G12
+                        if (available.length > 0) {
+                            const digGuard = available.shift();
+                            allShifts[yearMonth][digGuard.id][d] = 'G12';
+
+                            if (d + 1 <= totalDays && !allShifts[yearMonth][digGuard.id][d+1]) {
+                                allShifts[yearMonth][digGuard.id][d+1] = 'OFF';
+                            }
+                        }
+                    } else {
+                        // Distribución especial en días laborables
+                        // 2 de Guardia Diaria G12
+                        let assignedCount = 0;
+                        while (assignedCount < 2 && available.length > 0) {
+                            const w = available.shift();
+                            allShifts[yearMonth][w.id][d] = 'G12';
+                            assignedCount++;
+
+                            if (d + 1 <= totalDays && !allShifts[yearMonth][w.id][d+1]) {
+                                allShifts[yearMonth][w.id][d+1] = 'OFF';
+                            }
+                        }
+
+                        // Restante distribuye en M3 o D3 para complementar
+                        if (available.length > 0) {
+                            const m3Worker = available.shift();
+                            allShifts[yearMonth][m3Worker.id][d] = 'M3';
+                        }
+                        if (available.length > 0) {
+                            const d3Worker = available.shift();
+                            allShifts[yearMonth][d3Worker.id][d] = 'D3';
+                        }
+                    }
+                }
+            }
+
+            // Guardar cambios en LocalStorage
+            localStorage.setItem(db.STORAGE_KEYS.SHIFTS, JSON.stringify(allShifts));
+            closeAutoGenerateModal();
+            showToast(`Horario generado correctamente para ${targetRole}.`);
+            renderScheduleTable();
+        }
+
+        function getHoursCount(shiftMap) {
+            let total = 0;
+            if (!shiftMap) return 0;
+            Object.values(shiftMap).forEach(code => {
+                total += (SHIFT_HOURS[code] || 0);
+            });
+            return total;
+        }
+
+        async function openPavilionModal(pavilion = null) {
+            const container = document.getElementById('subpavilions-container');
+            container.innerHTML = '';
+
+            if (pavilion) {
+                document.getElementById('modal-pavilion-title').innerText = "Editar Pabellón";
+                document.getElementById('p-id').value = pavilion.id;
+                document.getElementById('p-entity').value = pavilion.entity || '';
+                document.getElementById('p-name').value = pavilion.name || '';
+
+                if (pavilion.subpavilions && pavilion.subpavilions.length > 0) {
+                    pavilion.subpavilions.forEach(sub => addSubpavilionRow(sub.name, sub.startBed, sub.endBed));
+                } else {
+                    addSubpavilionRow();
+                }
+            } else {
+                document.getElementById('modal-pavilion-title').innerText = "Crear Nuevo Pabellón";
+                document.getElementById('p-id').value = '';
+                document.getElementById('p-entity').value = '';
+                document.getElementById('p-name').value = '';
+                addSubpavilionRow();
+            }
+
+            calculateTotalBeds();
+            document.getElementById('modal-pavilion').classList.remove('hidden');
+        }
+
+        function closePavilionModal() {
+            document.getElementById('modal-pavilion').classList.add('hidden');
+        }
+
+        function addSubpavilionRow(name = '', startBed = 1, endBed = 15) {
+            const container = document.getElementById('subpavilions-container');
+            const row = document.createElement('div');
+            row.className = "flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 subpav-row";
+            row.innerHTML = `
+                <input type="text" placeholder="Ej: Sala 1" value="${escapeHTML(name)}" required class="sub-name flex-1 px-2.5 py-1.5 border rounded-lg text-xs font-semibold">
+                <input type="number" placeholder="Inicio" value="${startBed}" min="1" required onchange="calculateTotalBeds()" class="sub-start w-20 px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+                <span class="text-slate-400 font-bold">-</span>
+                <input type="number" placeholder="Fin" value="${endBed}" min="1" required onchange="calculateTotalBeds()" class="sub-end w-20 px-2 py-1.5 border rounded-lg text-xs font-mono text-center">
+                <button type="button" onclick="removeSubpavilionRow(this)" class="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(row);
+            calculateTotalBeds();
+        }
+
+        function removeSubpavilionRow(btn) {
+            const row = btn.closest('.subpav-row');
+            if (row) {
+                row.remove();
+                calculateTotalBeds();
+            }
+        }
+
+        function calculateTotalBeds() {
+            const rows = document.querySelectorAll('.subpav-row');
+            let total = 0;
+            rows.forEach(r => {
+                const start = parseInt(r.querySelector('.sub-start')?.value) || 0;
+                const end = parseInt(r.querySelector('.sub-end')?.value) || 0;
+                if (end >= start && start > 0) {
+                    total += (end - start + 1);
+                }
+            });
+            const bedDisplay = document.getElementById('p-total-beds');
+            if (bedDisplay) bedDisplay.innerText = `${total} Camas`;
+        }
+
+        async function savePavilionForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('p-id').value;
+            const entity = document.getElementById('p-entity').value.trim();
+            const name = document.getElementById('p-name').value.trim();
+
+            const rows = document.querySelectorAll('.subpav-row');
+            const subpavilions = [];
+
+            rows.forEach(r => {
+                const sName = r.querySelector('.sub-name').value.trim();
+                const sStart = parseInt(r.querySelector('.sub-start').value) || 1;
+                const sEnd = parseInt(r.querySelector('.sub-end').value) || 1;
+                if (sName) {
+                    subpavilions.push({ name: sName, startBed: sStart, endBed: sEnd });
+                }
+            });
+
+            const pavilion = {
+                id: id || undefined,
+                entity,
+                name,
+                subpavilions
+            };
+
+            await db.savePavilion(pavilion);
+            closePavilionModal();
+            showToast("Pabellón guardado correctamente.");
+            renderPavilionsGrid();
+        }
+
+        async function editPavilion(id) {
+            const pavilions = await db.getPavilions();
+            const pav = pavilions.find(p => p.id === id);
+            if (pav) {
+                openPavilionModal(pav);
+            }
+        }
+
+        async function deletePavilion(id) {
+            if (confirm("¿Está seguro de eliminar este pabellón?")) {
+                await db.deletePavilion(id);
+                showToast("Pabellón eliminado.");
+                renderPavilionsGrid();
+            }
+        }
+
+        async function exportToCSV() {
+            const yearMonth = getYearMonthKey();
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            const workers = await db.getWorkers();
+            const shifts = await db.getMonthlyShifts(yearMonth);
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            let headerRow = ["N°", "Nombre", "DNI", "Fotocheck", "Cargo"];
+            for (let d = 1; d <= totalDays; d++) headerRow.push(`Dia ${d}`);
+            headerRow.push("Total Horas");
+            csvContent += headerRow.join(",") + "\n";
+
+            workers.forEach((w, idx) => {
+                const wShifts = shifts[w.id] || {};
+                let row = [idx + 1, `"${w.name}"`, w.dni || '', w.barcode || '', w.role];
+                let totalH = 0;
+
+                for (let d = 1; d <= totalDays; d++) {
+                    const shift = wShifts[d] || 'OFF';
+                    row.push(shift);
+                    totalH += (SHIFT_HOURS[shift] || 0);
+                }
+                row.push(`${totalH}h`);
+                csvContent += row.join(",") + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Rol_Turnos_${yearMonth}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
