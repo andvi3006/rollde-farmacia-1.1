@@ -136,26 +136,44 @@
         }
 
         /* Sticker de Subpabellón individual */
-        .subpavilion-item {
-            background-color: #f8fafc;
+                /* --- CONTENEDOR DESGLOSADO DE SUBPABELLONES --- */
+
+        /* Caja contenedora general de la lista desglosada */
+        .subpavilions-container {
+            background-color: #f1f5f9; /* Slate 100 para dar contraste respecto a la tarjeta blanca */
             border: 1px solid #e2e8f0;
             border-radius: 0.75rem;
-            padding: 8px 12px;
-            transition: background-color 0.15s ease;
-        }
-        .subpavilion-item:hover {
-            background-color: #f1f5f9;
-            border-color: #cbd5e1;
+            padding: 10px;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.04); /* Sombra interior para efecto hundido/panel */
         }
 
-        /* Badge mini de rango de camas en subpabellón */
-        .subpavilion-bed-badge {
-            background-color: #ccfbf1;
-            color: #0f766e;
-            font-weight: 700;
-            font-size: 10px;
-            padding: 2px 6px;
+        /* Tarjeta de cada Subpabellón individual */
+        .subpavilion-item-highlight {
+            background-color: #ffffff;
+            border-left: 4px solid #0284c7; /* Acento azul médico */
+            border-top: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 8px 10px;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .subpavilion-item-highlight:hover {
+            transform: translateX(3px); /* Pequeño desplazamiento hacia la derecha al pasar el mouse */
+            border-left-color: #0d9488; /* Cambia a verde teal al hacer hover */
+        }
+
+        /* Badge del rango de camas destacado */
+        .subpavilion-bed-badge-v2 {
+            background: #e0f2fe; /* Azul cielo claro */
+            color: #0369a1;
+            font-weight: 800;
+            font-size: 11px;
+            padding: 3px 8px;
             border-radius: 6px;
+            border: 1px solid #bae6fd;
         }
     </style>
 </head>
@@ -2093,7 +2111,7 @@
             }
         }
 
-        function renderPavilionsGrid() {
+       function renderPavilionsGrid() {
             const grid = document.getElementById('pavilions-grid');
             if (!grid) return;
 
@@ -2104,37 +2122,44 @@
                 }
 
                 grid.innerHTML = pavilions.map(p => {
-                    // Calcular total de camas del pabellón sumando los rangos
                     let totalBeds = 0;
+
+                    // 1. DESGLOSE RESALTADO DE SUBPABELLONES
                     const subpHtml = (p.subpavilions || []).map(sp => {
                         const count = (sp.endBed - sp.startBed) + 1;
                         totalBeds += count > 0 ? count : 0;
+                        
                         return `
-                            <div class="subpavilion-item flex justify-between items-center">
+                            <div class="subpavilion-item-highlight flex justify-between items-center">
                                 <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-door-open text-teal-600"></i>
-                                    <span class="font-bold text-slate-700">${escapeHTML(sp.name)}</span>
+                                    <div class="w-6 h-6 rounded-md bg-sky-50 flex items-center justify-center text-sky-600">
+                                        <i class="fa-solid fa-door-open text-xs"></i>
+                                    </div>
+                                    <span class="font-bold text-xs text-slate-800">${escapeHTML(sp.name)}</span>
                                 </div>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="subpavilion-bed-badge">
-                                        <i class="fa-solid fa-bed text-[9px] mr-1"></i>Camas ${sp.startBed} al ${sp.endBed} (${count})
+                                
+                                <div class="flex items-center">
+                                    <span class="subpavilion-bed-badge-v2 flex items-center gap-1">
+                                        <i class="fa-solid fa-bed text-[10px]"></i>
+                                        <span>Camas ${sp.startBed} - ${sp.endBed}</span>
+                                        <span class="bg-sky-600 text-white rounded-full px-1.5 py-0.2 text-[9px] ml-1 font-black">${count}</span>
                                     </span>
                                 </div>
                             </div>
                         `;
                     }).join('');
 
+                    // 2. ESTRUCTURA COMPLETA DE LA TARJETA
                     return `
                         <div class="pavilion-card p-5 flex flex-col justify-between space-y-4">
                             <div>
-                                <!-- Encabezado con Entidad y Nombre -->
+                                <!-- Encabezado Pabellón -->
                                 <div class="flex justify-between items-start mb-2 gap-2">
                                     <span class="pavilion-entity-tag">
                                         <i class="fa-solid fa-building-hospital mr-1"></i>${escapeHTML(p.entity)}
                                     </span>
-                                    <!-- Sticker de Total de Camas -->
                                     <span class="bed-sticker">
-                                        <i class="fa-solid fa-bed"></i> ${totalBeds} Camas Total
+                                        <i class="fa-solid fa-bed"></i> ${totalBeds} Camas
                                     </span>
                                 </div>
 
@@ -2143,16 +2168,22 @@
                                     ${escapeHTML(p.name)}
                                 </h3>
 
-                                <!-- Lista de Subpabellones con Stickers -->
-                                <div class="mt-4 space-y-2">
-                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Subpabellones / Salas:</p>
-                                    <div class="space-y-1.5">
-                                        ${subpHtml || '<p class="text-xs text-slate-400 italic">Sin subpabellones configurados</p>'}
+                                <!-- Panel Hondo con Subpabellones Resaltados -->
+                                <div class="mt-4">
+                                    <div class="flex items-center justify-between mb-1.5 px-1">
+                                        <span class="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                            <i class="fa-solid fa-sitemap text-teal-600"></i> Desglose de Salas / Subpabellones
+                                        </span>
+                                        <span class="text-[10px] font-bold text-slate-400">${(p.subpavilions || []).length} Distribuidas</span>
+                                    </div>
+
+                                    <div class="subpavilions-container space-y-2">
+                                        ${subpHtml || '<p class="text-xs text-slate-400 italic text-center py-2">Sin subpabellones configurados</p>'}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Botones de Acción -->
+                            <!-- Botones -->
                             <div class="flex justify-end gap-2 border-t pt-3 border-slate-100">
                                 <button onclick="editPavilion('${p.id}')" class="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 rounded-lg transition flex items-center gap-1">
                                     <i class="fa-solid fa-pen-to-square"></i> Editar
